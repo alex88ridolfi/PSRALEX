@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob, shutil
+import numpy as np
+
+
+
+def flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P, flag_verbose_mode=False, errors=(0,0,0) ):
+    """                                                                                                                                                                                                                                                                      
+    SNR:     Signal-to-noise ratio
+    beta:    Digitization error
+    t_obs:   Integration time [s]
+    npol:    # of polarizations
+    G:       Gain [K/Jy]
+    bw:      Bandwidth [MHz]
+    W_frac:  Pulse duty cycle
+    P:       Pulsar Period [s] 
+    errors:  Errors for variables (SNR, Tsys, G)                                                                                                                            
+    """
+
+    S_mean_mJy = ( (SNR * beta * Tsys) / (G * np.sqrt(npol * t_obs * bw) ) )  * np.sqrt( W_frac*P / ( P - W_frac*P))
+
+    if flag_verbose_mode==True:
+        print "S_mean [mJy] = ( (%.2f * %.2f * %.2f K) / (%.1f K/Jy * sqrt( %d * %.1f s * %.2f MHz) ) )  * sqrt( %.2f * %.4f s / ( %.4f s - %.2f * %.4f s))  =  %.4f mJy" % (SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P, P , W_frac, P, S_mean_mJy)
+
+
+    if errors != (0,0,0):
+        delta_SNR = errors[0]
+        delta_Tsys = errors[1]
+        delta_G = errors[2]
+
+        #"Here f is the function S_mean_mJy"                                                                                                                                                                                                                                 
+        df_dSNR   =  ( (      beta * Tsys) / (            G * np.sqrt(npol * t_obs * bw) ) )  * np.sqrt( W_frac*P / ( P - W_frac*P))
+        df_dTsys  =  ( (SNR * beta       ) / (            G * np.sqrt(npol * t_obs * bw) ) )  * np.sqrt( W_frac*P / ( P - W_frac*P))
+        df_dG     = -( (SNR * beta * Tsys) / (np.power(G,2) * np.sqrt(npol * t_obs * bw) ) )  * np.sqrt( W_frac*P / ( P - W_frac*P))
+
+        S_mean_mJy_Err = np.sqrt(  np.power(df_dSNR * delta_SNR, 2)        +      np.power(df_dTsys * delta_Tsys, 2)       +      np.power(df_dG * delta_G, 2) )
+
+        return S_mean_mJy, S_mean_mJy_Err
+    else:
+        return S_mean_mJy
+
+
+#ARGOMENTI DA SHELL                                                                                                                                                              
+string_version = "1.0-beta1 (12Nov2017)"
+
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+    print "USAGE: %s -SNR [8.0] -beta [1.0] -Tsys [K] -G [K/Jy] -npol [2] -Tobs [s] -bw [MHz] -W_frac [0.05] -P [s]" % (os.path.basename(sys.argv[0]))
+    print
+    exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+    print "Version: %s" % (string_version)
+    exit()
+else:
+    for n in range(1, len(sys.argv)-1):
+        if (sys.argv[n] == "-SNR"):
+            SNR = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-beta"):
+            beta = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-Tsys"):
+            Tsys = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-G"):
+            G = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-npol"):
+            npol = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-Tobs"):
+            t_obs = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-bw"):
+            bw = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-W_frac"):
+            W_frac = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-P"):
+            P = np.float(sys.argv[n+1])
+
+
+
+S_mean_mJy = flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P)
+
+print "S_mean = %.5f mJy" % (S_mean_mJy)

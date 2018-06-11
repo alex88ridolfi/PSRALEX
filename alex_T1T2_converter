@@ -1,0 +1,442 @@
+#!/usr/bin/env python
+# coding=UTF-8
+import os, sys, glob
+import numpy as np
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+list_ordered_params_general_T2 = [ 'PSRJ',  'RAJ',  'DECJ', 'PMRA', 'PMDEC',  'LAMBDA', 'BETA', 'PMLAMBDA', 'PMBETA',  'PX', 'F0',   'F1',   'F2',   'F3',   'F4',   'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'PEPOCH','POSEPOCH','DMEPOCH',   'START', 'FINISH','DM', 'GLEP_1', 'GLPH_1', 'GLF0_1', 'GLF1_1', 'GLF0D_1', 'GLTD_1', 'GLEP_2', 'GLPH_2', 'GLF0_2', 'GLF1_2', 'GLF0D_2', 'GLTD_2', 'GLEP_3', 'GLPH_3', 'GLF0_3', 'GLF1_3', 'GLF0D_3', 'GLTD_3' 'NE_SW' ,'EPHEM','CLK','UNITS','TIMEEPH','T2CMETHOD','CORRECT_TROPOSPHERE','PLANET_SHAPIRO','DILATEFREQ','NTOA', 'TRES','TZRMJD','TZRFRQ','TZRSITE','NITS', 'IBOOT']
+
+list_ordered_params_binary_T2 = ['BINARY','A1', 'ECC',  'OM',  'T0',  'EPS1', 'EPS2',  'TASC', 'OMDOT', 'PB', 'PBDOT', 'XPBDOT', 'FB0', 'FB1',   'FB2',   'FB3',   'FB4',   'FB5',   'FB6',   'FB7',   'FB8',   'FB9','FB10','FB11','FB12', 'FB13','GAMMA', 'SINI', 'MTOT', 'M2', 'XDOT', 'EDOT', 'DTHETA', 'DR']
+
+def write_parfile_formatted_T2_with_err( dict_parfile, outname):
+        f_parfile = open(outname, "w")
+        #print
+        #print list_ordered_params_general_T2 + list_ordered_params_binary_T2
+        #print
+        for k in list_ordered_params_general_T2 + list_ordered_params_binary_T2:
+                if k in dict_parfile.keys():
+                        #print k, dict_parfile[k]
+                        string = "%-14s %-26s %s  %-s\n" % (k, dict_parfile[k][0], dict_parfile[k][1], dict_parfile[k][2])
+                        f_parfile.write(string)
+
+        f_parfile.close()
+
+
+
+def convert_obs_flag_T1_to_T2(flag_T1):
+        #print "Flag T1: ", flag_T1
+        if flag_T1=="1":                  flag_T2="gbt"
+        elif flag_T1=="2":                flag_T2="atca"
+        elif flag_T1=="3":                flag_T2="ao"
+        elif flag_T1=="4":                flag_T2="hobart"
+        elif flag_T1=="5":                flag_T2="nanshan"
+        elif flag_T1=="6":                flag_T2="tid43"
+        elif flag_T1=="7":                flag_T2="pks"
+        elif flag_T1=="8":                flag_T2="jb"
+        elif flag_T1=="c":                flag_T2="vla"
+        elif flag_T1=="f":                flag_T2="ncy"
+        elif flag_T1=="g":                flag_T2="eff"
+        elif flag_T1=="q":                flag_T2="jbdfb"
+        elif flag_T1=="i":                flag_T2="wsrt"
+        elif flag_T1=="t":                flag_T2="lofar"
+        elif flag_T1=="w":                flag_T2="ncyobs"
+        elif flag_T1=="x":                flag_T2="lwa1"
+        elif flag_T1=="z":                flag_T2="srt"
+        return flag_T2
+
+
+def import_timfile(timfile_name):
+        timfile = open( timfile_name, "r" )
+        list_timfile = []
+        for line in timfile:
+                if line != "\n":
+                        list_timfile.append(line.strip())
+        return list_timfile
+
+def import_parfile2( infile ):
+        parfile = open( infile, "r" )
+        dict_parfile = {}
+
+        for line in parfile:
+                if line != "\n":
+                        split_line = line.split()
+                        if len(split_line) == 2:
+                                dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), '-', '-' ]
+                                try:
+                                        if np.float(split_line[1]) == 0:
+                                                dict_parfile[ split_line[0] ][0]="0"
+                                except:
+                                        pass
+
+                        elif len(split_line) == 3:
+                                if (split_line[2]=="1" or split_line[2]=="0"):
+                                        dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), '-', '-' ]
+                                else:
+                                        dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), "0", split_line[2].replace("D-", "e-") ]
+
+                        elif len(split_line) == 4 and (split_line[2]=="1" or split_line[2]=="0"):
+                                dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), split_line[2], split_line[3].replace("D-", "e-") ]
+
+        return dict_parfile
+
+
+
+
+
+flag_tempo1_to_tempo2 = 0
+flag_tempo2_to_tempo1 = 0
+
+#ARGOMENTI DA SHELL
+string_version = "1.0-beta1 (12Nov2017)"
+
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+        print "USAGE: %s {-T1_to_T2 | -T2_to_T1}  -tim <tempo1_timfile.tim> -par <tempo1_parfile.par>\"" % (os.path.basename(sys.argv[0]))
+        exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+        for j in range( 1, len(sys.argv)):
+                if (sys.argv[j] == "-T1_to_T2"):
+                        flag_tempo1_to_tempo2 = 1
+                elif (sys.argv[j] == "-T2_to_T1"):
+                        flag_tempo2_to_tempo1 = 1
+                elif (sys.argv[j] == "-tim"):
+                        timfile = sys.argv[j+1]
+                elif (sys.argv[j] == "-par"):
+                        parfile = sys.argv[j+1]
+
+
+                        
+working_dir = os.getcwd()
+
+
+
+
+
+#print "working_dir = ", working_dir
+#print 
+
+list_lines_output_timfile = []
+if flag_tempo1_to_tempo2 == 1:
+        list_lines_output_timfile.append("FORMAT 1")
+
+
+current_archive = "unknown"
+
+
+timfile_basename = os.path.splitext(timfile)[0].split("/")[-1]
+parfile_basename = os.path.splitext(parfile)[0].split("/")[-1]
+
+#print "timfile = ", timfile
+#print "timfile_basename = ", timfile_basename
+
+list_lines_current_timfile = import_timfile(timfile)
+
+
+flag_put_label = 0
+group_count = 0
+string_group_label = ""
+list_strings_label_parfile = []
+for j in range(len(list_lines_current_timfile)):
+        #print
+        #print "********************************************"
+        print list_lines_current_timfile[j]
+        
+        line_T1 = list_lines_current_timfile[j]
+        split_line_T1 = line_T1.split()
+        
+        line_T2 = ""
+
+                
+        if flag_tempo1_to_tempo2 == 1:
+
+                if len(split_line_T1)==1 and (split_line_T1[0]=="JUMP"):
+                        if flag_put_label == 0:
+                                flag_put_label = 1
+                                group_count = group_count + 1
+                                string_group_label = " -i group_%02d" % (group_count)
+                                list_strings_label_parfile.append("JUMP%s 0 1" % string_group_label)
+                        elif flag_put_label == 1:
+                                flag_put_label = 0
+                                string_group_label = ""
+                        
+                #Formato PRINCETON (TEMPO1)
+                #elif (len(split_line_T1)==5 and (split_line_T1[4]=="0.00000"))
+                elif (len(split_line_T1)==5 and (np.float(split_line_T1[2]) > 40000 and np.float(split_line_T1[2]) < 60000)):
+                        #print "Ho individuato il formato PRINCETON"
+                        obs_flag_T1 = split_line_T1[0]
+                        freq_T1 = split_line_T1[1]
+                        mjd_T1 = split_line_T1[2]
+                        toa_err_T1 = split_line_T1[3]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+
+                #Formato PRINCETON (TEMPO1) commentato
+                elif len(split_line_T1)==6 and (np.float(split_line_T1[2]) > 40000 and np.float(split_line_T1[2]) < 60000) and (split_line_T1[0]=="C"):
+                        #print "Ho individuato il formato PRINCETON COMMENTATO"
+                        obs_flag_T1 = split_line_T1[0+1]
+                        freq_T1 = split_line_T1[1+1]
+                        mjd_T1 = split_line_T1[2+1]
+                        toa_err_T1 = split_line_T1[3+1]
+                        
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "C %s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+
+                                
+                elif len(split_line_T1)==2 and (split_line_T1[0] == "C") and "." in split_line_T1[1] :
+                        current_archive = split_line_T1[1]
+
+                        
+
+                        
+                        
+                #Formato PRINCETON VAR (TEMPO1)
+                elif (len(split_line_T1)==6 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
+                        #print "Ho individuato il formato PRINCETON VAR"
+                        obs_flag_T1 = split_line_T1[0]
+                        freq_T1 = split_line_T1[3]
+                        mjd_T1 = split_line_T1[4]
+                        toa_err_T1 = split_line_T1[5]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+                #Formato PRINCETON VAR commentato
+                elif (len(split_line_T1)==7 and (split_line_T1[0]=="C") and (np.float(split_line_T1[5]) > 40000 and np.float(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
+                        #print "Ho individuato il formato PRINCETON VAR commentato"
+                        obs_flag_T1 = split_line_T1[0+1]
+                        freq_T1 = split_line_T1[3+1]
+                        mjd_T1 = split_line_T1[4+1]
+                        toa_err_T1 = split_line_T1[5+1]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+
+
+                #Formato PRINCETON VAR-2 (TEMPO1)
+                elif (len(split_line_T1)==8 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
+                        #print "Ho individuato il formato PRINCETON VAR-2"
+                        obs_flag_T1 = split_line_T1[0]
+                        freq_T1 = split_line_T1[3]
+                        mjd_T1 = split_line_T1[4]
+                        toa_err_T1 = split_line_T1[5]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+                #Formato PRINCETON VAR-2 commentato
+                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float(split_line_T1[5]) > 40000 and np.float(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
+                        #print "Ho individuato il formato PRINCETON VAR-2 commentato"
+                        obs_flag_T1 = split_line_T1[0+1]
+                        freq_T1 = split_line_T1[3+1]
+                        mjd_T1 = split_line_T1[4+1]
+                        toa_err_T1 = split_line_T1[5+1]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "0"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+
+                                
+                                        
+                elif len(split_line_T1)==8 and (split_line_T1[5]=="0.00"):
+                        #print "Ho individuato il formato PARKES"
+                        current_archive = split_line_T1[0]
+                        obs_flag_T1 = split_line_T1[7]
+                        freq_T1 = split_line_T1[3]
+                        mjd_T1 = split_line_T1[4]
+                        toa_err_T1 = split_line_T1[6]
+                        
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+                        
+
+                elif len(split_line_T1)==9 and (split_line_T1[6]=="0.00") and (split_line_T1[0]=="C"):
+                        #print "Ho individuato il formato PARKES COMMENTATO"
+                        current_archive = split_line_T1[0+1]
+                        obs_flag_T1 = split_line_T1[7 + 1 ]
+                        freq_T1 = split_line_T1[3+1]
+                        mjd_T1 = split_line_T1[4+1]
+                        toa_err_T1 = split_line_T1[6+1]
+                        
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "C %s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+                elif (len(split_line_T1)==8 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit()) and (np.float(split_line_T1[3]) > 300 and np.float(split_line_T1[3]) < 10000) ):
+                        #print "Ho individuato il formato LIGO"
+                        obs_flag_T1 = split_line_T1[7]
+                        freq_T1 = split_line_T1[3]
+                        mjd_T1 = split_line_T1[4]
+                        toa_err_T1 = split_line_T1[6]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+
+                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float(split_line_T1[4+1]) > 40000 and np.float(split_line_T1[4+1]) < 60000) and (split_line_T1[1+1].isdigit()) and (np.float(split_line_T1[3+1]) > 300 and np.float(split_line_T1[3+1]) < 10000) ):
+                        #print "Ho individuato il formato LIGO COMMENTATO"
+                        obs_flag_T1 = split_line_T1[7+1]
+                        freq_T1 = split_line_T1[3+1]
+                        mjd_T1 = split_line_T1[4+1]
+                        toa_err_T1 = split_line_T1[6+1]
+                        
+                        #print "obs_flag_T1, ", obs_flag_T1
+                        obs_flag_T2 = convert_obs_flag_T1_to_T2(obs_flag_T1)
+                        freq_T2 = "%11.6f" % (np.float64(freq_T1))
+                        mjd_T2 = mjd_T1 + "00"
+                        toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
+                        
+                        line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
+                        
+
+                else:
+                        #print "Ho settato line_T2 = line_T1"
+                        line_T2 = line_T1
+                                        
+                #print
+                #print "line_T1: ", line_T1
+                #print "line_T2: ", line_T2
+
+
+
+                list_lines_output_timfile.append(line_T2)
+
+output_timfile_name = timfile_basename + "_T2.tim"
+output_timfile = open(output_timfile_name, "w")
+
+for n in range(len(list_lines_output_timfile)):
+        output_timfile.write("%s\n" % (list_lines_output_timfile[n]))
+output_timfile.close()
+                        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#############################################################
+# NOW PARFILE CONVERSION
+#############################################################
+
+dict_parfile_T1 = import_parfile2(parfile)
+#print dict_parfile_T1
+#print
+dict_parfile_T2 = {}
+
+for k in dict_parfile_T1.keys():
+        value_tempo1        = dict_parfile_T1[k][0]
+        flag_fit_tempo1     = dict_parfile_T1[k][1]
+        err_tempo1          = dict_parfile_T1[k][2]
+        
+        
+        if "D-" in value_tempo1:                value_tempo2 = value_tempo1.replace("D-", "e-")
+        else:                value_tempo2 = value_tempo1
+
+        if "D-" in err_tempo1:                  err_tempo2 = err_tempo1.replace("D-", "e-")
+        elif err_tempo1 == "-":                 err_tempo2 = ""
+        else:                                   err_tempo2 = err_tempo1
+        
+        if flag_fit_tempo1 == "-":              flag_fit_tempo2 = ""
+        else:                                   flag_fit_tempo2 = flag_fit_tempo1
+        
+
+                
+        dict_parfile_T2[k] = [ value_tempo2, flag_fit_tempo2, err_tempo2 ]
+
+for k in ["DMEPOCH", "POSEPOCH"]:
+        if k not in dict_parfile_T1.keys():
+                dict_parfile_T2[k] = [ dict_parfile_T2['PEPOCH'][0], "", "" ]
+                #print k, dict_parfile_T2[k]
+
+dict_parfile_T2['PSRJ'] = dict_parfile_T2['PSR']
+dict_parfile_T2['EPHVER']= ['5', '', '']
+dict_parfile_T2['CLK']= ['TT(BIPM)', '', '']
+dict_parfile_T2['T2CMETHOD']= ['IAU2000B', '', '']
+dict_parfile_T2['NE_SW']= ['10.000', '', '']
+dict_parfile_T2['TIMEEPH']= ['IF99', '', '']
+
+
+
+if 'E' in dict_parfile_T1.keys():
+        dict_parfile_T2['ECC']= dict_parfile_T2['E']
+        dict_parfile_T2.pop('E')
+if 'PBDOT' in dict_parfile_T2.keys():
+        dict_parfile_T2['PBDOT'][0] = "%.10e" % np.float( dict_parfile_T2['PBDOT'][0] + "e-12")
+if 'SOLARN0' in dict_parfile_T2.keys():
+        dict_parfile_T2.pop('SOLARN0')
+
+        
+dict_parfile_T2.pop('PSR')
+
+
+output_parfile_prefit_name = parfile_basename + "_T2_prefit.par"
+output_parfile_postfit_name = parfile_basename + "_T2.par"
+write_parfile_formatted_T2_with_err( dict_parfile_T2, output_parfile_prefit_name)
+
+with open(output_parfile_prefit_name,'a') as f:   f.write( "MODE 1\n")
+for l in list_strings_label_parfile:
+        with open(output_parfile_prefit_name,'a') as f:   f.write( l + "\n")
+
+
+cmd_tempo2 = "tempo2 -f %s %s -newpar" % (output_parfile_prefit_name, output_timfile_name)
+os.system(cmd_tempo2)
+
+os.rename("new.par", output_parfile_postfit_name)
+os.remove(output_parfile_prefit_name)
+
+exit()
+
+
+

@@ -1,0 +1,129 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob
+import random, time, gc, imp
+import numpy as np
+
+import psrchive
+
+
+
+
+
+        
+"""
+Alessandro Ridolfi, Bonn, January 2017
+"""
+nbin_requested = 1000000
+peakflux = 1.0
+newext = "norm"
+
+string_version = "1.0-beta1 (12Nov2017)"
+
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+        print "USAGE: %s -ar \"*.ar\" [-nbin 512 -peakflux 1.0]" % (os.path.basename(sys.argv[0]))
+        exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+        for j in range( 1, len(sys.argv)):
+                if (sys.argv[j] == "-ar"):
+                        string_files = sys.argv[j+1]
+                        if ("*" in string_files) or ("?" in string_files):
+                                print string_files.strip("\"")
+                                list_files = sorted(glob.glob(string_files.strip("\"")), key=lambda s: s.lower())
+                        else:
+                                list_files = string_files.replace(" ","").split(",")
+                                N_files = len(list_files)
+                elif (sys.argv[j] == "-peakflux"):
+                        peakflux = np.float(sys.argv[j+1])
+                elif (sys.argv[j] == "-nbin"):
+                        nbin = int(sys.argv[j+1])
+                elif (sys.argv[j] == "-e"):
+                        newext = sys.argv[j+1]
+
+                                            
+
+
+print "Files: "
+print
+for i in range(len(list_files)):
+        archive_name = list_files[i]
+        print i, archive_name
+
+list_profiles = []
+list_mjds = []
+list_dates = []
+for i in range(len(list_files)):
+        archive_name = list_files[i]
+        archive_basename = os.path.splitext(archive_name)[0]
+
+        print "============================================================="
+        print "ARCHIVE: %s" % (archive_name) 
+        print "============================================================="
+
+        
+        ar = psrchive.Archive_load( archive_name )
+
+        
+
+        nbin    = ar.get_nbin()
+        nsub    = ar.get_nsubint()
+        npol    = ar.get_npol()
+        nchan   = ar.get_nchan()
+        
+        ar.pscrunch()
+        ar.tscrunch()
+        ar.fscrunch()
+        ar.remove_baseline()
+        
+        prof_I = ar.get_Profile(0,0,0);     I = prof_I.get_amps()
+
+        
+        I_max = np.amax(I)
+        scale_factor = I_max/peakflux
+
+        ar = psrchive.Archive_load( archive_name )
+        
+                                
+
+        if nbin > nbin_requested:
+                ar.bscrunch_to_nbin(int(nbin_requested))
+                nbin = int(nbin_requested)
+                
+
+
+        for isub in range(nsub):
+                for ichan in range(nchan):
+                        for ipol in range(npol):
+                                prof = ar.get_Profile(isub,ipol,ichan)
+                                for ibin in range(nbin):
+                                        prof[ibin] = prof[ibin]/scale_factor
+                
+        #prof_I_new = ar.get_Profile(0,0,0);     I_new = prof_I.get_amps()
+
+        """
+        plt.plot(np.arange(nbin), prof_I_original, color="black")
+        #plt.xlim([i_left-20, i_right+20])
+        plt.xlim([0, nbin])
+        plt.axvline(i_right, color="blue")
+        plt.axvline(i_left, color="red")
+        plt.axvline(nbin/4, color="black")
+        plt.axhline(I_max, color="red")
+        #plt.axhline(0, color="black", ls="--")
+        #plt.xticks(np.arange(0,1, 0.1))
+        plt.grid()
+        plt.show(block=True)
+        #plt.draw()
+        """
+        
+        
+        ar.unload(archive_name + ".%s" % (newext))
+

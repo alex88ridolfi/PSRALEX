@@ -1,0 +1,284 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+import sys, os, os.path, glob
+import random, time
+import numpy as np
+import subprocess
+
+import psrchive
+
+
+def get_command_output(command):
+    list_for_Popen = command.split()
+    proc = subprocess.Popen(list_for_Popen, stdout=subprocess.PIPE)
+    out, err = proc.communicate()
+    return out
+
+def pazi(archive, flag_print_cmd=False):
+        cmd_pazi = ["pazi", archive]
+        p = subprocess.Popen( cmd_pazi, stdout=subprocess.PIPE)
+        p.wait()
+
+def show_archive_ids(list_original_archives, list_current_archives):
+	print "Archives:"
+	print
+	for i in range(0, len(list_current_archives)):
+		string_archive = "%3d) %-40s" % (i, list_original_archives[i]) 
+		if (list_current_archives[i] != list_original_archives[i]):
+			string_archive = string_archive + "    ---> %s" % (list_current_archives[i])
+		print string_archive
+
+def ask_for_operation(id_ar, archive):
+	print "ARCHIVE: %3d) %s" % (id_ar, archive)
+	nchan,nsub,npol = get_command_output(  "vap -c nchan,nsub,npol %s" % (archive)   ).split()[-3:]
+	print "%8s: %4s" % ("nchan", nchan) 
+	print "%8s: %4s" % ("nsub", nsub)
+	print "%8s: %4s" % ("npol", npol)
+	print
+
+	print "  %-20s -> View/clean with pazi" % ("v")
+        print "  %-20s -> Fast Frequency-domain RFI zap with pazi" % ("f")
+        print "  %-20s -> Fast time-domain RFI zap with pazi" % ("t")
+        print "  %-20s -> Flip band" % ("b")
+        print "  %-20s -> Reverse channels order (no effects on the archive)" % ("r")
+
+	print "  %-20s -> Go to archive N" % ("a N")
+	print "  %-20s -> List archives and relative ids" % ("l")
+	print "  %-20s -> Next archive" % ("n")
+	print "  %-20s -> Undo and go back to the original archive" % ("u")
+	print "  %-20s -> I am done!" % ("done")
+	print 
+	string_operation = raw_input("Operation: ")
+	return string_operation
+
+def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_operation, newext):
+	list_str_op = string_operation.split()
+	str_op = ''.join(list_str_op)
+
+
+        if (str_op == "done" or str_op == "DONE"):
+                return archive, "no_write", len(list_curr_archives)
+        
+	elif (str_op[0] == "a" or str_op[0] == "A"):
+		i = int(str_op[1:])
+		return archive, "no_write", i
+
+	elif (str_op[0] == "l" or str_op[0] == "L"):
+		show_archive_ids(list_orig_archives, list_curr_archives)
+		return archive, "no_write", id_ar
+
+	elif (str_op[0] == "v" or str_op[0] == "V"):
+		pazi(archive)
+		#new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                new_archive_name = archive.split(".")[0] + ".%s" % (newext)
+		try:
+			os.rename(archive+".pazi", new_archive_name)
+			return new_archive_name, "", id_ar
+		except:
+			return archive, "no_write", id_ar
+
+        elif (str_op[0] == "f" or str_op[0] == "F"):
+                ext = os.path.splitext(archive)[-1]
+                archive_basename = os.path.splitext(archive)[0]
+                
+                print "Time scrunching with pam..."
+                os.system("pam -T -p -e .temp_Tp %s" % ( archive) )
+                archive_temp = "%s.temp_Tp" % archive_basename
+
+                temp_with_newext = "%s.temp_Tp" % (newext)
+                if archive_temp.endswith(temp_with_newext):
+                        archive_basename = archive_temp.split("."+temp_with_newext)[0]
+                        os.rename(archive_temp, "%s.temp_Tp" % (archive_basename))
+                        archive_temp = "%s.temp_Tp" % (archive_basename)
+                
+                pazi_output = get_command_output("pazi %s" % (archive_temp) )
+
+                try:
+                        ar = psrchive.Archive_load( "%s.temp_Tp.pazi" % (archive_basename) )
+                except RuntimeError:
+                        ar = psrchive.Archive_load( archive  )
+
+                nsub = ar.get_nsubint()
+                flag_found_nonempty_subint = 0
+                weights = ar.get_weights()
+                for i in range(0,nsub):
+                        if not np.count_nonzero(weights[i]) == 0:  #if the values are all zero
+                                index_nonempty_subint = i
+                                flag_found_nonempty_subint == 1
+
+
+                array_weights = ar.get_weights()[index_nonempty_subint]
+                list_channels_to_zap = np.where( array_weights == 0)[0]
+                                                                        
+                        
+                
+                cmd_paz = 'paz -z "%s" -e %s %s' % (' '.join( [str(x) for x in list_channels_to_zap]), newext, archive)
+                os.system(cmd_paz)
+
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return new_archive_name, "no_write", id_ar
+
+
+        elif (str_op[0] == "t" or str_op[0] == "T"):
+                ext = os.path.splitext(archive)[-1]
+                archive_basename = os.path.splitext(archive)[0]
+                
+                print "Frequency scrunching with pam..."
+                os.system("pam -F -p -e .temp_Fp %s" % ( archive) )
+                archive_temp = "%s.temp_Fp" % archive_basename
+
+                temp_with_newext = "%s.temp_Fp" % (newext)
+                if archive_temp.endswith(temp_with_newext):
+                        archive_basename = archive_temp.split("."+temp_with_newext)[0]
+                        os.rename(archive_temp, "%s.temp_Fp" % (archive_basename))
+                        archive_temp = "%s.temp_Fp" % (archive_basename)
+                
+                pazi_output = get_command_output("pazi %s" % (archive_temp) )
+
+                try:
+                        ar = psrchive.Archive_load( "%s.temp_Fp.pazi" % (archive_basename) )
+                except RuntimeError:
+                        ar = psrchive.Archive_load( archive  )
+
+                nsub = ar.get_nsubint()
+                list_subint_to_zap = []
+                weights = ar.get_weights()
+                for i in range(0,nsub):
+                        if np.count_nonzero(weights[i]) == 0:
+                                list_subint_to_zap.append(i)
+                
+                
+                
+                cmd_paz = 'paz -w "%s" -e %s %s' % (' '.join( [str(x) for x in list_subint_to_zap]), newext, archive)
+                os.system(cmd_paz)
+
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return new_archive_name, "no_write", id_ar
+
+
+
+
+
+        
+        elif (str_op[0] == "b" or str_op[0] == "B"):
+                cmd_pam = 'pam -B -e %s %s' % (newext, archive)
+                os.system(cmd_pam)
+
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return new_archive_name, "no_write", id_ar
+
+        elif (str_op[0] == "r" or str_op[0] == "R"):
+                cmd_pam = 'pam --reverse_freqs -e %s %s' % (newext, archive)
+                os.system(cmd_pam)
+                
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return new_archive_name, "no_write", id_ar
+
+        
+
+        elif (str_op[0] == "n" or str_op[0] == "N"):
+                return archive, "zero_toas", id_ar + 1
+        
+        
+
+	elif (str_op[0] == "u" or str_op[0] == "U"):
+		try:
+			new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+			os.remove(new_archive_name)
+		except:
+			print "WARNING: You had not modified the original archive!\n\n"
+
+                return list_orig_archives[id_ar], "no_write", id_ar
+	
+	else:
+		print
+		print "WARNING: Command not valid! "
+		return archive, "no_write", id_ar
+
+
+
+
+string_patoptions = ""
+outfilename = "TOAs_all.tim"
+new_ext = ""
+flag_autoextract = 0
+
+list_file_patterns = []
+
+#ARGOMENTI DA SHELL
+string_version = "1.0-beta1 (12Nov2017)"
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+	print "USAGE: %s -e newext  -files \"*.ar\"" % (os.path.basename(sys.argv[0]))
+	exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+	for j in range( 1, len(sys.argv)):
+		if (sys.argv[j] == "-e"):
+			new_ext = sys.argv[j+1]
+		elif (sys.argv[j] == "-files"):
+                        list_file_patterns = glob.glob(sys.argv[j+1])
+                        
+                        
+
+if list_file_patterns == []:
+	list_file_patterns = sys.argv[len(sys.argv)-1].split(",")
+
+list_original_archives = []
+list_current_archives = []
+for k in range(0, len(list_file_patterns)):
+	list_original_archives = list_original_archives + glob.glob( list_file_patterns[k] )
+	list_current_archives = list_current_archives + glob.glob( list_file_patterns[k] )
+
+
+list_original_archives = sorted(list_original_archives)
+list_current_archives = sorted(list_current_archives)
+
+list_toas = len(list_original_archives)*[""]
+
+
+print
+print "#"*62
+print "#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#"
+print "#"*62
+print
+show_archive_ids(list_original_archives, list_current_archives)
+print
+print
+        
+i = 0
+new_i = 0
+
+while (i < len(list_original_archives)):
+	original_archive = list_original_archives[i]
+	current_archive = list_current_archives[i]
+	archive_basename = os.path.splitext(original_archive)[0]
+	
+
+
+	try:
+                print "========================================================================"
+                string_operation = ask_for_operation(i, current_archive)
+
+                        
+		list_current_archives[i], str_toas , new_i = do_operation(i, current_archive, list_original_archives, list_current_archives, string_operation, new_ext)
+		
+		
+		
+	except ValueError:
+		print "You raised a value error"
+	except IndexError:
+		print "You raised an index error"
+		
+	i = new_i
+
+
+list_files_to_remove = glob.glob("*.temp_Tp*") + glob.glob("*.temp_Fp*")
+for f in list_files_to_remove:
+        os.remove(f)

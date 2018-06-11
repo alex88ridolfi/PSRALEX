@@ -1,0 +1,889 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import numpy as np
+import os, os.path, sys, glob
+
+
+nosearch_string = ""
+flag_this_epoch = 0
+
+
+M_SUN_CGS                                       = 1.989e33                      #1.989 x 10^33 g                                                                              
+M_EARTH_CGS                                     = 5.97219e+27
+G                                               = 6.67259e-8                    #6.67259 x 10^(-8) cm^3 /g s^2          #costante gravitazione universale
+R_SUN_CGS                                       = 6.955e10                      #6.955x10^10 cm                               
+R_EARTH_CGS                                     = 6.378e8
+LIGHT_SPEED                                     = 2.99792458e10                 #Speed of Light in cgs
+R_NS                                            = 1.0e6                         #1 million cm = 10 km, the typical radius of a NS
+SIGMA_THOMSON                                   = 6.652459e-25                  #Thomson cross section 6.652459 x 10^-25 cm^2
+K_BOLTZMANN                                     = 1.380658e-16                  #Boltzmann constant in cgs
+MASS_PROTON                                     = 1.6726231e-24                 #Proton mass in grams
+MASS_ELECTRON                                   = 9.1093897e-28                 #Electron mass in grams
+ELECTRON_CHARGE                                 = 4.8032e-10                    #Electron charge in cgs (statcoulomb, or electrostatic unit of charge (esu) )
+YEAR_CGS                                        = 3.1556926e7                   #One year in seconds
+DAY_CGS                                         = 86400
+LIGHT_SECOND                                    = LIGHT_SPEED                   #Distance in cm travelled by light in vacuum over one second
+DISPERSION_CONSTANT                             = ELECTRON_CHARGE**2 / ( 2*np.pi*MASS_ELECTRON*LIGHT_SPEED)                #costante di dispersione, anche uguale a E_CHARGE**2 / 2*pi*M_E*C
+PARSEC_CGS                                      = 3.08567758e18                 #1 pc in centimeter
+KPC_CGS                                         = 1.0e3 * PARSEC_CGS
+CM_IN_PARSEC                                    = 1./PARSEC_CGS
+SECOND_IN_UNITS_OF_YEAR                         = 1./YEAR_CGS
+SECOND_IN_YEARS                                 = 1./YEAR_CGS
+GRAM_IN_MSUN                                    = 1./M_SUN_CGS
+PLANCK_CONSTANT                                 = 6.62606957e-27                #erg * s
+CLASSICAL_ELECTRON_RADIUS                       = 2.81794092e-13                #Classical Electron radius in cm
+V0_SUN_GAL_CGS                                  = 220 * 1.0e5                   # 220 km/s = 220.0e5 cm/s
+R0_SUN_GAL_CGS                                  = 7.7 * KPC_CGS                 # Sun Galactocentric distance
+R0_SUN_GAL_KPC                                  = 7.7                          # Sun Galactocentric distance
+NS_MOMENT_OF_INERTIA_CGS                        = 1.0e45                       #10^45 g cm^2 
+T_SUN_CGS                                       = 4.925490947e-6               #G*M_SUN_CGS/(LIGHT_SPEED**3)
+
+
+
+dict_param_formatters = {'PSR': "{:<17s}", 'PSRJ': "{:<17s}", 'RAJ': "{:<9s}", 'DECJ': "{:<9s}",'PMRA': "{:<19s}",'PMDEC': "{:<19s}",'PX': "{:<20s}",'F0': "{:<6s}",'F1': "{:<8s}",'F2': "{:<8s}",'F3': "{:<8s}",'F4': "{:<8s}",'F5': "{:<8s}",'PEPOCH': "{:<14s}",'START': "{:<17s}",'FINISH': "{:<17s}",'DM': "{:<17s}",'DMEPOCH': "{:<15s}",'SOLARN0': "{:<21s}",'EPHEM': "{:<20s}",'CLK': "{:<20s}",'UNITS': "{:<20s}",'TIMEEPH': "{:<20s}",'T2CMETHOD': "{:<20s}",'CORRECT_TROPOSPHERE': "{:<20s}",'PLANET_SHAPIRO': "{:<20s}",'DILATEFREQ': "{:<20s}",'NTOA': "{:<23s}",'TRES': "{:<21s}",'TZRMJD': "{:<8s}",'TZRFRQ': "{:<18s}",'TZRSITE': "{:<25s}",'NITS': "{:<23s}", 'IBOOT': "{:<22s}",'BINARY': "{:<18s}",'A1': "{:<15s}",'E': "{:<14s}", 'ECC': "{:<14s}", 'T0': "{:<10s}",'OM': "{:<10s}",'PB': "{:<12s}",'FB0': "{:<7s}",'FB1': "{:<7s}",'FB2': "{:<7s}",'FB3': "{:<7s}",'FB4': "{:<7s}",'FB5': "{:<7s}",'FB6': "{:<7s}",'FB7': "{:<7s}",'FB8': "{:<7s}",'FB9': "{:<7s}",'FB10': "{:<7s}",'FB11': "{:<7s}",'FB12': "{:<7s}",'FB13': "{:<7s}",'GAMMA': "{:<17s}",'PBDOT': "{:<17s}",'OMDOT': "{:<17s}",'SINI': "{:<18s}",'MTOT': "{:<18s}",'M2': "{:<18s}",'EPS1': "{:<18s}",'EPS2': "{:<18s}"}
+
+
+
+list_ordered_params_general = [ 'PSR', 'PSRJ', 'RAJ',  'DECJ', 'PMRA', 'PMDEC', 'LAMBDA', 'BETA', 'PMLAMBDA', 'PMBETA', 'PX','F0',   'F1',   'F2',   'F3',   'F4',   'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',  'PEPOCH',   'START', 'FINISH', 'DM', 'GLEP_1', 'GLPH_1', 'GLF0_1', 'GLF1_1', 'GLF0D_1', 'GLTD_1', 'GLEP_2', 'GLPH_2', 'GLF0_2', 'GLF1_2', 'GLF0D_2', 'GLTD_2', 'GLEP_3', 'GLPH_3', 'GLF0_3', 'GLF1_3', 'GLF0D_3', 'GLTD_3', 'DMEPOCH',   'SOLARN0','EPHEM','CLK','UNITS','TIMEEPH','T2CMETHOD','CORRECT_TROPOSPHERE','PLANET_SHAPIRO','DILATEFREQ','NTOA', 'TRES','TZRMJD','TZRFRQ','TZRSITE','NITS', 'IBOOT']
+
+list_ordered_params_general_T2 = [ 'PSRJ',  'RAJ',  'DECJ', 'PMRA', 'PMDEC',  'LAMBDA', 'BETA', 'PMLAMBDA', 'PMBETA',  'PX', 'F0',   'F1',   'F2',   'F3',   'F4',   'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'PEPOCH','POSEPOCH','DMEPOCH',   'START', 'FINISH','DM', 'GLEP_1', 'GLPH_1', 'GLF0_1', 'GLF1_1', 'GLF0D_1', 'GLTD_1', 'GLEP_2', 'GLPH_2', 'GLF0_2', 'GLF1_2', 'GLF0D_2', 'GLTD_2', 'GLEP_3', 'GLPH_3', 'GLF0_3', 'GLF1_3', 'GLF0D_3', 'GLTD_3' 'NE_SW' ,'EPHEM','CLK','UNITS','TIMEEPH','T2CMETHOD','CORRECT_TROPOSPHERE','PLANET_SHAPIRO','DILATEFREQ','NTOA', 'TRES','TZRMJD','TZRFRQ','TZRSITE','NITS', 'IBOOT']
+
+list_ordered_params_general_no_PSR = [ 'RAJ',  'DECJ', 'PMRA', 'PMDEC',  'LAMBDA', 'BETA', 'PMLAMBDA', 'PMBETA', 'PX','F0', 'F1',   'F2',   'F3',   'F4',   'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',  'PEPOCH',   'START', 'FINISH', 'DM', 'GLEP_1', 'GLPH_1', 'GLF0_1', 'GLF1_1', 'GLF0D_1', 'GLTD_1', 'GLEP_2', 'GLPH_2', 'GLF0_2', 'GLF1_2', 'GLF0D_2', 'GLTD_2', 'GLEP_3', 'GLPH_3', 'GLF0_3', 'GLF1_3', 'GLF0D_3', 'GLTD_3',  'DMEPOCH',   'SOLARN0','EPHEM','CLK','UNITS','TIMEEPH','T2CMETHOD','CORRECT_TROPOSPHERE','PLANET_SHAPIRO','DILATEFREQ','NTOA', 'TRES','TZRMJD','TZRFRQ','TZRSITE','NITS', 'IBOOT']
+
+list_ordered_params_binary = ['BINARY', 'A1',   'E', 'ECC', 'OM',  'T0',   'EPS1', 'EPS2', 'TASC', 'OMDOT', 'PB', 'PBDOT', 'XPBDOT', 'FB0', 'FB1',   'FB2',   'FB3',   'FB4',   'FB5',   'FB6',   'FB7',   'FB8',   'FB9','FB10','FB11','FB12','FB13','GAMMA', 'SINI', 'MTOT', 'M2', 'XDOT', 'EDOT', 'DTHETA', 'DR']
+
+list_ordered_params_binary_T2 = ['BINARY','A1', 'ECC',  'OM',  'T0',  'EPS1', 'EPS2',  'TASC', 'OMDOT', 'PB', 'PBDOT', 'XPBDOT', 'FB0', 'FB1',   'FB2',   'FB3',   'FB4',   'FB5',   'FB6',   'FB7',   'FB8',   'FB9','FB10','FB11','FB12','FB13','GAMMA', 'SINI', 'MTOT', 'M2', 'XDOT', 'EDOT', 'DTHETA', 'DR']
+
+
+list_ordered_params_derived = ['P0', 'P1', 'MASSFN', 'MINMASS', 'MEDMASS', 'GC_ANG_DIST', 'GC_LIN_DIST', 'GC_CORERADII_DIST', 'GC_DIST_RA', 'GC_DIST_DEC', 'BSURF', 'P1_I', 'LSD', 'AGE', 'MTOT']
+
+dict_parameters_descriptions = {
+'PSR':        "Pulsar Name",
+'RAJ':        "Right Ascension, $\\alpha$ (J2000)",
+'DECJ':       "Declination, $\\delta$ (J2000)",
+'PMRA':       "Proper Motion in $\\alpha$, $\\mu_\\alpha$ (mas yr$^{-1}$)",
+'PMDEC':      "Proper Motion in $\\delta$, $\\mu_\\delta$ (mas yr$^{-1}$)",
+'LAMBDA':     "Ecliptic Longitude, $\\lambda$ (deg)",
+'BETA':       "Ecliptic Latitude, $\\beta$ (deg)",
+'PMLAMBDA':   "Proper Motion in $\\lambda$, $\\mu_\\lambda$ (mas yr$^{-1}$)  ",
+'PMBETA':     "Proper Motion in $\\beta$, $\\mu_\\beta$ (mas yr$^{-1}$)",
+'PX':         "Parallax (mas)",
+'F0':         "Spin Frequency, $f$ (s$^{-1}$)",
+'F1':         "1st Spin Frequency derivative, $\\dot{f}$ (Hz s$^{-2}$)",
+'F2':         "2nd Spin Frequency derivative, $\\ddot{f}$ (Hz s$^{-3}$)",
+'P0':         "Spin Period, $P$ (s)",
+'P1':         "1st Spin Period derivative, $\\dot{P}$ (s s$^{-1}$)",
+'P2':      "2st Spin Period derivative, $\\ddot{P}$ (s s$^{-2}$)",
+'PEPOCH':  "Reference Epoch (MJD)",
+'START':   "Start of Timing Data (MJD)",
+'FINISH':  "End of Timing Data (MJD)",
+'DM':      "Dispersion Measure, DM (pc cm$^{-3}$)",
+'GLEP_1':      "Epoch of glitch \#1 (MJD)",
+'GLPH_1':      "Phase increment of glitch \#1",
+'GLF0_1':      "Permanent pulse frequency increment of glitch \#1",
+'GLF1_1':      "Permanent frequency derivative increment of glitch \#1",
+'GLEP_2':      "Epoch of glitch \#2 (MJD)",
+'GLPH_2':      "Phase increment of glitch \#2",
+'GLF0_2':      "Permanent pulse frequency increment of glitch \#2",
+'GLF1_2':      "Permanent frequency derivative increment of glitch \#2",
+'EPHEM':   "Solar System Ephemeris",
+'CLK':   "Terrestrial Time Standard",
+'UNITS':   "Time Units",
+'NTOA':    "Number of TOAs",
+'TRES':    "Residuals RMS ($\mu$s)",
+'BINARY':  "Binary Model",
+'A1':      "Projected Semi-major Axis, $x_{\\rm p}$ (lt-s)",
+'E':       "Orbital Eccentricity, $e$",
+'T0':      "Epoch of passage at Periastron, $T_0$ (MJD)",
+'TASC':    "Epoch of passage at Ascending Node, $T_\\textrm{asc}$ (MJD)",
+'PB':      "Orbital Period, $P_b$ (days)",
+'FB0':     "Orbital Frequency, $f_{\\rm b}$ (s$^{-1}$)",
+'FB1':     "1st Orbital Freq. derivative, $f^{(1)}_{\\rm b}$ (s$^{-2}$)",
+'FB2':     "2nd Orbital Freq. derivative, $f^{(2)}_{\\rm b}$ (s$^{-3}$)",
+'FB3':     "3rd Orbital Freq. derivative, $f^{(3)}_{\\rm b}$ (s$^{-4}$)",
+'FB4':     "4th Orbital Freq. derivative, $f^{(4)}_{\\rm b}$ (s$^{-5}$)",
+'FB5':     "5th Orbital Freq. derivative, $f^{(5)}_{\\rm b}$ (s$^{-6}$)",
+'FB6':     "6th Orbital Freq. derivative, $f^{(6)}_{\\rm b}$ (s$^{-7}$)",
+'FB7':     "7th Orbital Freq. derivative, $f^{(7)}_{\\rm b}$ (s$^{-8}$)",
+'FB8':     "8th Orbital Freq. derivative, $f^{(8)}_{\\rm b}$ (s$^{-9}$)",
+'FB9':     "9th Orbital Freq. derivative, $f^{(9)}_{\\rm b}$ (s$^{-10}$)",
+'FB10':     "10th Orbital Freq. derivative, $f^{(10)}_{\\rm b}$ (s$^{-11}$)",
+'FB11':     "11th Orbital Freq. derivative, $f^{(11)}_{\\rm b}$ (s$^{-12}$)",
+'FB12':     "12th Orbital Freq. derivative, $f^{(12)}_{\\rm b}$ (s$^{-13}$)",
+'FB13':     "13th Orbital Freq. derivative, $f^{(13)}_{\\rm b}$ (s$^{-14}$)",
+'OM':      "Longitude of Periastron, $\\omega$ (deg)",
+'GAMMA':   "Einstein Delay, $\\gamma$ (s)",
+'PBDOT':   "Orbital Period derivative, $\\dot{P}_{\\rm b}$ (10$^{-12}$ s s$^{-1}$)",
+'XPBDOT':  "Rate of change of orbital period minus GR prediction (10$^{-12}$ s s$^{-1}$)",
+'OMDOT':   "Rate of periastron advance, $\\dot{\omega}$ (deg/yr)",
+'XDOT':    "Rate of change of projected semi-major axis, $\dot{x}_{\\rm p}$ (10$^{-12}$ s s$^{-1}$)",
+'EDOT':    "Rate of change of eccentricity, $\dot{e}$ (10$^{-12}$)",
+'MTOT':    "Total Mass, $M$ (M$_\\odot$)",
+'M2':             "Companion Mass, $M_{\\rm c}$ (M$_\\odot$)",
+'EPS1':           "First Laplace-Lagrange parameter, $\\eta$",
+'EPS2':           "First Laplace-Lagrange parameter, $\\kappa$",
+'DTHETA':    "Relativistic deformation of the orbit, $\\delta_{\\theta}$ (10$^{-6}$)",
+'DR':        "Relativistic deformation of the orbit, $\\delta_{\\rm r}$ (10$^{-6}$)",
+'MASSFN':         "Mass Function, $f(M_{\\rm p})$ (${\\rm M}_\\odot$)",
+'MINMASS':        "Minimum companion mass, $M_{\\rm c, min}$ (${\\rm M}_\\odot$)",
+'MEDMASS':        "Median companion mass, $M_{\\rm c, med}$ (${\\rm M}_\\odot$)",
+'GC_CORERADII_DIST':    "Projected distance from GC center, $r_\\perp$ (core radii)",
+'GC_LIN_DIST':          "Projected distance from GC center, $r_\\perp$ (pc)",
+'GC_DIST_RA':           "Offset from GC center in $\\alpha$, $\\theta_\\alpha$",
+'GC_DIST_DEC':          "Offset from GC center in $\\delta$, $\\theta_\\delta$",
+'GC_ANG_DIST':          "Total offset from GC center, $\\theta_\\perp$ (arcmin)",
+'BSURF':                "Surface Magnetic Field, $B_0$, (10$^{8}$ G)",
+'P1_I':                 "Intrinsic Spin-down, $\\dot{P}_{\\rm int}$ (10$^{-21}$ s s$^{-1}$)",
+'LSD':                 "Intrinsic Spin-down Luminosity, $L_{\\rm sd}$ (10$^{33}$ erg s$^{-1}$)",
+'AGE':                  "Characteristic Age, $\\tau_{\\rm c}$ (Gyr)"
+}
+
+def convert_distance_from_arcmin_to_pc(angular_separation_arcmin, distance_kpc):
+        '''                                                                                                                                                                                                                        
+        Formula used: d * tan(alpha) = l                                                                                                                                                                                           
+                                                                                                                                                                                                                                   
+        where d is the distance of the source from Earth (pc), alpha is the angular distance (rad), l is the linear distance (pc)                                                                                                  
+                                                                                                                                                                                                                                   
+        '''
+
+        angular_separation_deg = angular_separation_arcmin / 60.
+        angular_separation_rad = angular_separation_deg * np.pi/180.
+        distance_pc = distance_kpc * 1000
+
+        l_pc = distance_pc * np.tan(angular_separation_rad)
+
+        return l_pc
+
+
+def calculate_angular_distance_in_rad( string_RA1,string_DEC1, string_RA2, string_DEC2):
+        if ":" in string_RA1:
+                array_RA1 = np.array(  string_RA1.split(":"), dtype='float64')
+                array_RA1_deg = 15.0 * array_RA1
+
+        if ":" in string_DEC1:
+                array_DEC1_deg = np.array(  string_DEC1.split(":"), dtype='float64')
+                if array_DEC1_deg[0] < 0:
+                        array_DEC1_deg[1] = -array_DEC1_deg[1]
+                        array_DEC1_deg[2] = -array_DEC1_deg[2]
+
+
+        if ":" in string_RA2:
+                array_RA2 = np.array(  string_RA2.split(":"), dtype='float64')
+                array_RA2_deg =15.0 * array_RA2
+        if ":" in string_DEC2:
+                array_DEC2_deg = np.array(  string_DEC2.split(":"), dtype='float64')
+                if array_DEC2_deg[0] < 0:
+                        array_DEC2_deg[1] = -array_DEC2_deg[1]
+                        array_DEC2_deg[2] = -array_DEC2_deg[2]
+
+        RA1_deg = array_RA1_deg[0] + (1./60)*array_RA1_deg[1] + (1./3600)*array_RA1_deg[2]
+        RA1_rad = RA1_deg * np.pi/180.
+        RA2_deg = array_RA2_deg[0] + (1./60)*array_RA2_deg[1] + (1./3600)*array_RA2_deg[2]
+        RA2_rad = RA2_deg * np.pi/180.
+
+        DEC1_deg = array_DEC1_deg[0] + (1./60)*array_DEC1_deg[1] + (1./3600)*array_DEC1_deg[2]
+        DEC1_rad = DEC1_deg * np.pi/180.
+        DEC2_deg = array_DEC2_deg[0] + (1./60)*array_DEC2_deg[1] + (1./3600)*array_DEC2_deg[2]
+        DEC2_rad = DEC2_deg * np.pi/180.
+
+        delta_RA_rad = RA1_rad - RA2_rad
+
+        alpha_rad = np.arccos( np.cos(DEC1_rad)*np.cos(DEC2_rad) * np.cos(delta_RA_rad)  + np.sin(DEC1_rad)*np.sin(DEC2_rad) )
+
+        return alpha_rad
+
+
+def convert_RA_into_deg(string_RA, DEC_deg):
+        if ":" in string_RA:
+                array_RA = np.array(  string_RA.split(":"), dtype='float64')
+                array_RA_deg = 15.0 * array_RA
+
+        #print array_RA_deg                                                                                                                                                                                                        
+        RA_deg = np.cos(DEC_deg*np.pi/180.) * (array_RA_deg[0] + (1./60)*array_RA_deg[1] + (1./3600)*array_RA_deg[2])
+        return RA_deg
+
+
+def convert_DEC_into_deg(string_DEC):
+        #print "string_DEC: ", string_DEC                                                                                                                                                                                          
+        if ":" in string_DEC:
+                array_DEC_deg = np.array(  string_DEC.split(":"), dtype='float64')
+                if array_DEC_deg[0] < 0:
+                        array_DEC_deg[1] = -array_DEC_deg[1]
+                        array_DEC_deg[2] = -array_DEC_deg[2]
+
+
+        #print "array_DEC_deg: ", array_DEC_deg                                                                                                                                                                                    
+        DEC_deg = array_DEC_deg[0] + (1./60)*array_DEC_deg[1] + (1./3600)*array_DEC_deg[2]
+        return DEC_deg
+
+
+
+
+
+def calculate_Mtot_from_OMDOT(Pb_s, ecc, omega_dot_rad_s):
+    Mtot_Msun = np.power(            (1./3.) * omega_dot_rad_s * np.power( Pb_s/(2*np.pi), 5./3.) * np.power( T_SUN_CGS, -2./3.) * (1 - np.power(ecc, 2))     , 3./2.)
+    return Mtot_Msun
+
+
+def calculate_mass_function_from_Pb_and_xp(Pb_s, xp_cm):
+        f_Mp_grams = (4*np.power(np.pi, 2.) / G ) * (np.power(xp_cm, 3.)  / np.power(Pb_s, 2.))
+        return f_Mp_grams
+
+
+
+def solve_mass_function_for_Mc_from_f_Mp(inc, f_Mp, Mp=1.4):
+        Mc_min  = f_Mp
+        K = f_Mp / ( np.power( np.sin(inc), 3 ) )               #costante K                                                                                                                                                        
+
+        x_n1            = Mc_min                        #parto dalla x estremo inferiore del range possibile di Mc                                                                                                                 
+        x_n             = Mc_min +1                     #valore a a buffo                                                                                                                                                          
+        count = 0
+
+
+        while ( abs(x_n1 - x_n) > 1.0e-6 ):
+                count = count +1
+                x_n = x_n1
+                y_xn                    =  (x_n**3) / ( (Mp +x_n)**2 ) -  K
+                y_derivative_xn         =  3*(x_n**2) /  ((Mp +x_n)**2 ) -2*(x_n**3) /  ( (Mp +x_n)**3 )
+
+                x_n1 = x_n - ( y_xn / y_derivative_xn )
+        
+        return x_n1
+
+
+def calculate_Characteristic_Age_in_seconds(P, Pdot):
+        """                                                                                                                                                                                                                        
+        P        INTRINSIC pulsar spin period (s)                                                                                                                                                                                  
+        Pdot     INTRINSIC pulsar spin down (s/s)                                                                                                                                                                                  
+        """
+
+        tau_c_s = P / (2*Pdot)
+
+        return tau_c_s
+
+
+def calculate_Bsurface(P, Pdot):
+        """                                                                                                                                                                                                                        
+        P        INTRINSIC pulsar spin period (s)                                                                                                                                                                                  
+        Pdot     INTRINSIC pulsar spin down (s/s)                                                                                                                                                                                  
+        """
+
+        Bs_Gauss = 1.0e12  *  np.sqrt( Pdot/1.0e-15 )  *  np.sqrt( P )
+
+        return Bs_Gauss
+
+def calculate_Edot(P0_int, Pdot_int):
+        """                                                                                                                                                                                                                        
+        P0_int        INTRINSIC pulsar spin period (s)                                                                                                                                                                             
+        Pdot_int     INTRINSIC pulsar spin down (s/s)                                                                                                                                                                              
+        """
+        I = NS_MOMENT_OF_INERTIA_CGS
+
+
+        Edot = 4*np.power(np.pi, 2.) * I * Pdot_int / np.power(P0_int, 3.)
+        return Edot
+
+
+def calculate_Pdot_intrinsic(F0, F1, Pb_s, Pb_dot):
+
+        P0      = 1./F0
+        Pdot    = convert_F1_into_Pdot(F0, F1)
+
+        #print "Pdot ", Pdot                                                                                                                                                                                                       
+        Pdot_over_P_intrinsic = (Pdot/P0) - (Pb_dot/Pb_s)
+        #print "Pdot_over_P_intrinsic ", Pdot_over_P_intrinsic                                                                                                                                                                     
+        Pdot_intrinsic = P0 * Pdot_over_P_intrinsic
+
+        return Pdot_intrinsic
+
+
+def convert_F1err_into_Pdot_err(F0, F0_err, F1, F1_err):
+        Pdot_err =  np.sqrt(         np.power(   (-1./np.power(F0,2) ) * F1_err  ,2)            \
+                                 +   np.power(   (F1 /np.power(F0,3) ) * F0_err  ,2)                 )
+        return Pdot_err
+
+
+def convert_F1_into_Pdot(F0, F1):
+        Pdot =   -F1 / (np.power(F0, 2))
+        return Pdot
+
+def convert_F0err_into_P0err(F0, F0_err):
+        P0_err = np.sqrt(  np.power( (     -1./np.power(F0,2)     )  * F0_err ,2)   )
+        return P0_err
+
+def import_parfile2( infile ):
+        parfile = open( infile, "r" )
+        dict_parfile = {}
+
+        for line in parfile:
+                if line != "\n":
+                        split_line = line.split()
+                        if len(split_line) == 2:
+                                dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), '-', '-' ]
+                                try:
+                                        if np.float(split_line[1]) == 0:
+                                                dict_parfile[ split_line[0] ][0]="0"
+                                except:
+                                        pass
+                        elif len(split_line) == 3:
+                                if (split_line[2]=="1" or split_line[2]=="0"):
+                                        dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), '-', '-' ]
+                                else:
+                                        dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), "0", split_line[2].replace("D-", "e-") ]
+
+                        elif len(split_line) == 4 and (split_line[2]=="1" or split_line[2]=="0"):
+                                dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), split_line[2], split_line[3].replace("D-", "e-") ]
+
+        #print dict_parfile
+        return dict_parfile
+
+
+def union(a, b):
+    """ return the union of two lists """
+    return list(set(a) | set(b))
+
+
+def make_string_value_with_err(string_value, string_err, flag_scientific_notation=1):
+        #print "AOH: string_err:", string_err
+ 	if "D-" in string_value:
+		#print "Found D- in string_value"
+		string_value = string_value.replace("D-", "e-")
+		#print string_value
+	if "D-" in string_err:
+		#print "Found D- in string_err"
+		string_err = string_err.replace("D-", "e-")	
+		#print string_err
+	
+
+	float_value = np.float64(string_value)	
+	#print "%.20e" % (float_value)
+	magnitude_value = int( ("%.20e" % (float_value)).split("e")[-1] )
+	
+	float_err = np.float64(string_err)
+	#print "float_err = %.20e" % (float_err)
+
+
+	magnitude_err = int( ("%.20e" % (float_err)).split("e")[-1] )
+	#print magnitude_err
+
+	str_err = str("+%.20e" % (float_err))
+	#print str_err[:4]
+	rounded_err   = int( round( np.float(str_err[:4]) ) )
+	#print rounded_err
+
+
+	magnitude_diff = magnitude_value - magnitude_err
+	#print float_value
+	str_power = "$\\times 10^{%d}$" % (magnitude_value)
+	str_value = str("%+.20e" % (float_value))
+	#print "str_value[:3+magnitude_err+1] = ", str_value[:(3+magnitude_diff+1)]
+	
+	#print "magnitude_value = ", magnitude_value
+	#print "magnitude_err = ", magnitude_err
+	
+	#print "magnitude_diff", magnitude_diff
+	
+	if (magnitude_value <= 4  and  magnitude_value > -2):
+		flag_scientific_notation = 0
+		
+
+	#print "Qui flag_scientific_notation = ", flag_scientific_notation
+	if flag_scientific_notation == 0:
+		
+		float_value_to_round = np.float(str_value[:3+magnitude_diff+2])
+		#print "float_value_to_round = ", float_value_to_round
+		rounded_value   = np.around( float_value_to_round, decimals=magnitude_diff )
+	        #print rounded_value 
+		rounded_value = rounded_value * np.power(10.0,magnitude_value)
+		#print "rounded_value2 = ", rounded_value 
+		str_rounded_value = '%.*f' % (int(np.fabs(magnitude_err)), rounded_value)
+		if (len(str_rounded_value)>1 and str_rounded_value.startswith("-")):  str_rounded_value = "$-$" + str_rounded_value[1:]; #print "--->%s" % str_rounded_value
+		str_power = ""
+		
+	elif flag_scientific_notation == 1:
+		float_value_to_round = np.float(str_value[:3+magnitude_diff+1])
+		#print "float_value_to_round = ", float_value_to_round
+		rounded_value   = np.around( float_value_to_round, decimals=magnitude_diff )
+		#print "rounded_value = ", rounded_value
+		str_rounded_value = '%.*f' % (int(np.fabs(magnitude_diff)), rounded_value)
+		
+		str_power = "$\\times 10^{%d}$" % (magnitude_value)
+                if (len(str_rounded_value)>1 and str_value.startswith("-")):  str_rounded_value = "$-$" + str_rounded_value[1:]; #print "--->%s" % str_rounded_value
+                
+		
+	#print "rounded_err = ", rounded_err
+	
+	#print "flag_scientific_notation = ", flag_scientific_notation
+	#print "AOH"
+	#print str( np.around(float_value, decimals=magnitude_err))
+	string_final = str_rounded_value + "(%d)" % rounded_err + str_power
+
+	return string_final
+
+def make_string_value(string_value, flag_scientific_notation=1):
+
+ 	if "D-" in string_value:
+		#print "Found D- in string_value"
+		string_value = string_value.replace("D-", "e-")
+		#print string_value
+	
+
+	float_value = np.float64(string_value)	
+	#print "%.20e" % (float_value)
+	magnitude_value = int( ("%.20e" % (float_value)).split("e")[-1] )
+	
+	#print float_value
+	str_power = "$\\times 10^{%d}$" % (magnitude_value)
+	str_value = str("%+.20e" % (float_value))
+	
+	if (magnitude_value <= 4  and  magnitude_value > -2):
+		flag_scientific_notation = 0
+
+        if flag_scientific_notation == 0:
+                float_value_to_round = np.float(str_value)
+                rounded_value   = np.around( float_value_to_round, decimals=3 )
+                rounded_value = rounded_value * np.power(10.0,magnitude_value)
+                str_rounded_value = '%.*f' % (int(np.fabs(magnitude_value)), rounded_value)
+                str_power = ""
+
+        elif flag_scientific_notation == 1:
+                float_value_to_round = np.float(str_value)
+                rounded_value   = np.around( float_value_to_round, decimals=magnitude_value )
+                str_rounded_value = '%.*f' % (int(np.fabs(magnitude_value)), rounded_value)
+		str_power = "$\\times 10^{%d}$" % (magnitude_value)
+                
+        """
+	#print "Qui flag_scientific_notation = ", flag_scientific_notation
+	if flag_scientific_notation == 0:
+		
+		float_value_to_round = np.float(str_value[:3+magnitude_diff+2])
+		#print "float_value_to_round = ", float_value_to_round
+		rounded_value   = np.around( float_value_to_round, decimals=3 )
+	        #print rounded_value 
+		rounded_value = rounded_value * np.power(10.0,magnitude_value)
+		#print "rounded_value2 = ", rounded_value 
+		if (len(str_rounded_value)>1 and str_rounded_value.startswith("-")):  str_rounded_value = "$-$" + str_rounded_value[1:]; print "--->%s" % str_rounded_value
+		str_power = ""
+		
+	elif flag_scientific_notation == 1:
+		float_value_to_round = np.float(str_value[:3+magnitude_diff+1])
+		#print "float_value_to_round = ", float_value_to_round
+		rounded_value   = np.around( float_value_to_round, decimals=magnitude_diff )
+		#print "rounded_value = ", rounded_value
+		str_rounded_value = '%.*f' % (int(np.fabs(magnitude_diff)), rounded_value)
+		
+		str_power = "$\\times 10^{%d}$" % (magnitude_value)
+                if (len(str_rounded_value)>1 and str_value.startswith("-")):  str_rounded_value = "$-$" + str_rounded_value[1:]; print "--->%s" % str_rounded_value
+        """     
+        #print str_rounded_value, str_power
+	string_final = str_rounded_value + str_power
+
+	return string_final
+
+
+
+flag_calculate_distances_in_arcmin = 0
+flag_calculate_distances_in_units_of_core_radii = 0
+flag_calculate_distances_in_pc = 0
+
+#ARGOMENTI DA SHELL
+string_version = "1.0-beta1 (12Nov2017)"
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+    print "USAGE: %s -par \"ephemerides_*.par\" [-gc_center_coord \"RA,DEC\"] [-gc_distance [kpc] -gc_core_radius [arcmin] ]" % (os.path.basename(sys.argv[0]))
+    exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+    for j in range( 1, len(sys.argv)):
+        if (sys.argv[j] == "-par"):
+            string_files = sys.argv[j+1]
+            if ("*" in string_files) or ("?" in string_files):
+                #print string_files.strip("\"")
+                list_parfiles = sorted(glob.glob(string_files.strip("\"")))
+            else:
+                list_parfiles = string_files.replace(" ","").split(",")
+                
+        elif (sys.argv[j] == "-gc_center_coord"):
+            flag_calculate_distances_in_arcmin = 1
+            gc_center_coord_string = sys.argv[j+1]
+            gc_center_RA_str, gc_center_DEC_str = gc_center_coord_string.split(",")
+
+            
+        elif (sys.argv[j] == "-gc_distance"):
+            flag_calculate_distances_in_pc = 1
+            gc_distance_kpc = np.float(sys.argv[j+1])
+            
+        elif (sys.argv[j] == "-gc_core_radius"):
+            flag_calculate_distances_in_units_of_core_radii = 1
+            gc_core_radius_arcmin = np.float(sys.argv[j+1])
+            
+
+N_parfiles = len(list_parfiles)
+
+list_dict_parfiles = []
+
+list_union_of_params = []
+
+
+print
+print "#"*62
+print "#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#"
+print "#"*62
+print
+
+
+for i in range(N_parfiles):
+        
+        list_dict_parfiles.append(     import_parfile2( list_parfiles[i] )     )
+        list_dict_parfiles[i]['P0'] = [0,0,0]
+        list_dict_parfiles[i]['P1'] = [0,0,0]
+        #print
+        #print list_dict_parfiles[i]
+        #print
+        #rint list_dict_parfiles[i]['F0']
+        list_dict_parfiles[i]['P0'][0] = "%.25f" % (1./np.float64(list_dict_parfiles[i]['F0'][0] ))
+        #print "Hey!", list_dict_parfiles[i]['F0'][0], list_dict_parfiles[i]['P0'][0]
+        list_dict_parfiles[i]['P0'][2] = "%.25f" % (convert_F0err_into_P0err(np.float64(list_dict_parfiles[i]['F0'][0] ), np.float64(list_dict_parfiles[i]['F0'][2] )))
+        
+        list_dict_parfiles[i]['P1'][0] = "%.25f" % (convert_F1_into_Pdot(np.float64(list_dict_parfiles[i]['F0'][0]), np.float64(list_dict_parfiles[i]['F1'][0] ) ))
+    
+        list_dict_parfiles[i]['P1'][2] = "%.25f" % (convert_F1err_into_Pdot_err(np.float64(list_dict_parfiles[i]['F0'][0]), np.float64(list_dict_parfiles[i]['F0'][2]), np.float64(list_dict_parfiles[i]['F1'][0]), np.float64(list_dict_parfiles[i]['F1'][2] ) ))
+
+        #print list_dict_parfiles[i]
+    
+        #print "****************************************************"
+        #print "i = %d" % (i)
+        
+        #    for f in sorted(list_dict_parfiles[i].keys()): print f
+	
+        if i==0:
+                list_union_of_params = list_dict_parfiles[i].keys()
+        elif i>0:
+                list_union_of_params = union(list_union_of_params, list_dict_parfiles[i].keys() )
+		
+
+
+#print "****************************************************"
+#print "UNION of parameters:"
+#for f in sorted(list_union_of_params):
+#    print f
+
+
+
+#FIRST ADD DERIVED PARAMETER INFORMATION
+for i in range(N_parfiles):
+
+    if "BINARY" in list_dict_parfiles[i]:
+        
+        try:      Pb_s = np.float(list_dict_parfiles[i]["PB"][0]) * 86400.
+        except:   Pb_s = 1./ np.float(list_dict_parfiles[i]["FB0"][0])
+        
+        Pb_days = Pb_s * 86400.
+        xp_s  = np.float(list_dict_parfiles[i]["A1"][0]) 
+        xp_cm = xp_s * LIGHT_SPEED
+        
+        f_Mp_g = calculate_mass_function_from_Pb_and_xp(Pb_s, xp_cm)
+        f_Mp_Msun = f_Mp_g / M_SUN_CGS
+        
+        Mc_min_Msun = solve_mass_function_for_Mc_from_f_Mp(90*np.pi/180., f_Mp_Msun, Mp=1.4)
+
+        Mc_median_Msun = solve_mass_function_for_Mc_from_f_Mp(60*np.pi/180., f_Mp_Msun, Mp=1.4)
+    
+
+        print "Mass Function:  %20.6e Msun" % (f_Mp_Msun)
+        print "Minimum Mc:     %20.6e Msun" % (Mc_min_Msun)
+        print "Median Mc:      %20.6e Msun" % (Mc_median_Msun)
+        
+        
+
+        list_dict_parfiles[i]['MASSFN']  = [ "%.2e" % (f_Mp_Msun), "-", "*" ]
+        list_dict_parfiles[i]['MINMASS'] = [ "%.2e" % (Mc_min_Msun), "-", "*" ]
+        list_dict_parfiles[i]['MEDMASS'] = [ "%.2e" % (Mc_median_Msun), "-", "*" ]
+
+            
+    if "OMDOT" in list_dict_parfiles[i]:
+        try:      Pb_s = np.float(list_dict_parfiles[i]["PB"][0]) * 86400.
+        except:   Pb_s = 1./ np.float(list_dict_parfiles[i]["FB0"][0])
+        
+        try:      ecc = np.float(list_dict_parfiles[i]["E"][0])
+        except:
+            try:
+                ecc = 1./ np.float(list_dict_parfiles[i]["ECC"][0])
+            except:
+                ecc = np.sqrt( np.float(list_dict_parfiles[i]["EPS1"][0])**2 + np.float(list_dict_parfiles[i]["EPS2"][0])**2)
+                
+        omega_dot_deg_yr = np.float(list_dict_parfiles[i]["OMDOT"][0])
+        omega_dot_rad_s = omega_dot_deg_yr * (np.pi/180.) / (YEAR_CGS)
+        
+        Mtot_from_OMDOT = calculate_Mtot_from_OMDOT(Pb_s, ecc, omega_dot_rad_s)
+        print "Mtot_from_OMDOT:  %20.6f Msun" % (Mtot_from_OMDOT)
+        list_dict_parfiles[i]['MTOT'] = [ "%.3f" % (Mtot_from_OMDOT), "-", "*" ]
+
+        
+    if (flag_calculate_distances_in_arcmin == 1):
+        
+        DEC_deg = convert_DEC_into_deg(list_dict_parfiles[i]["DECJ"][0])
+        RA_deg = convert_RA_into_deg(list_dict_parfiles[i]["RAJ"][0], DEC_deg)
+
+        gc_center_DEC_deg = convert_DEC_into_deg( gc_center_DEC_str )
+        gc_center_RA_deg = convert_RA_into_deg( gc_center_RA_str, gc_center_DEC_deg )
+
+
+        distance_in_RA_rad  =  calculate_angular_distance_in_rad( list_dict_parfiles[i]["RAJ"][0], list_dict_parfiles[i]["DECJ"][0], gc_center_RA_str, list_dict_parfiles[i]["DECJ"][0])
+        distance_in_RA_arcmin = distance_in_RA_rad * (180./np.pi) * 60.
+
+        if RA_deg < gc_center_RA_deg:
+            distance_in_RA_arcmin = - distance_in_RA_arcmin
+        
+        distance_in_DEC_arcmin =   (DEC_deg - gc_center_DEC_deg)  * 60.
+
+        distance_deg = calculate_angular_distance_in_rad(list_dict_parfiles[i]["RAJ"][0], list_dict_parfiles[i]["DECJ"][0], gc_center_RA_str, gc_center_DEC_str) * 180./np.pi
+        distance_arcmin = distance_deg * 60.
+
+        
+
+        print "Distance in RA:  %20.6f arcmin" % (distance_in_RA_arcmin)
+        print "Distance in DEC: %20.6f arcmin" % (distance_in_DEC_arcmin)
+        print "Total Distance:  %20.6f arcmin" % (distance_arcmin)
+        
+        list_dict_parfiles[i]['GC_DIST_RA']   = [ "%.3f" % (distance_in_RA_arcmin), "-", "*" ]
+        list_dict_parfiles[i]['GC_DIST_DEC']  = [ "%.3f" % (distance_in_DEC_arcmin), "-", "*" ]
+        list_dict_parfiles[i]['GC_ANG_DIST']  = [ "%.3f" % (distance_arcmin), "-", "*" ]
+
+        
+    if (flag_calculate_distances_in_units_of_core_radii == 1):
+        distance_core_radii = distance_arcmin / gc_core_radius_arcmin
+        print "Total Distance:  %20.6f core radii" % (distance_core_radii)
+        
+        list_dict_parfiles[i]['GC_CORERADII_DIST']    = [ "%.3f" % (distance_core_radii), "-", "*" ]
+        
+    if (flag_calculate_distances_in_pc == 1):
+        distance_pc = convert_distance_from_arcmin_to_pc(distance_arcmin, gc_distance_kpc)
+        print "Total Distance:  %20.6f pc (for an assumed distance of %.3f kpc)" % (distance_pc, gc_distance_kpc)
+
+        list_dict_parfiles[i]['GC_LIN_DIST']  = [ "%.3f" % (distance_pc), "-", "*" ]
+    
+    
+    if ("F0" in list_dict_parfiles[i]) and ("F1" in list_dict_parfiles[i]) and ("PB" in list_dict_parfiles[i]) and ("PBDOT" in list_dict_parfiles[i]):
+        F0 = np.float(list_dict_parfiles[i]["F0"][0])
+        F1 = np.float(list_dict_parfiles[i]["F1"][0])
+        Pb_s = np.float(list_dict_parfiles[i]["PB"][0])*86400.
+        Pbdot = np.float(list_dict_parfiles[i]["PBDOT"][0])*1.0e-12
+
+        Pdot_intrinsic = calculate_Pdot_intrinsic(F0, F1, Pb_s, Pbdot)
+
+
+        P0 = 1./F0
+        Edot_intrinsic = calculate_Edot(P0, Pdot_intrinsic)
+
+        B_surf_intrinsic = calculate_Bsurface(P0, Pdot_intrinsic)
+        tau_c_intrinsic_s = calculate_Characteristic_Age_in_seconds(P0, Pdot_intrinsic)
+        tau_c_intrinsic_Gyr = tau_c_intrinsic_s / (1.0e9 * 365.25 * 86400)
+        
+        print "Pdot_intrinsic:  %20.6e" % (Pdot_intrinsic)
+        print "Edot_intrinsic:  %20.6e" % (Edot_intrinsic)
+        print "Bsurf_intrinsic:  %20.6e" % (B_surf_intrinsic)
+        
+        list_dict_parfiles[i]['EDOT']    = [ "%.2f" % (Edot_intrinsic/1.0e33), "-", "*" ]
+        list_dict_parfiles[i]['BSURF']   = [ "%.2f" % (B_surf_intrinsic/1.0e8), "-", "*" ]
+        list_dict_parfiles[i]['P1_I']   = [ "%.2f" % (Pdot_intrinsic/1.0e-21), "-", "*" ]
+        list_dict_parfiles[i]['AGE']   = [ "%.2f" % (tau_c_intrinsic_Gyr), "-", "*" ]
+
+
+
+list_dict_latex_strings = []
+for i in range(N_parfiles):
+    list_dict_latex_strings.append({})
+
+for i in range(N_parfiles):
+    #print
+    #print
+    #print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+    #print "%s" % (list_parfiles[i])
+    #print "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"
+    #print
+
+    #print list_dict_parfiles[i].keys()
+    for k in list_dict_parfiles[i].keys():
+	#print
+	#print "*******************************************************************"
+	#print list_dict_parfiles[i]
+	
+ 	str_prefix = ""
+	string_param_value = ""	
+	flag_scientific_notation = 1
+
+        
+        f_Mp_g = 0; f_Mp_Msun = 0; Mc_min = 0
+        Pb_s = 0; Pb_days = 0; xp_s = 0; xp_cm = 0; 
+
+	str_value = list_dict_parfiles[i][k][0]
+	str_err = list_dict_parfiles[i][k][2]
+        #print
+        #print "str_value: \n", str_value
+        #print "str_err: \n", str_err
+        #print
+        #print k, str_value
+
+	if k=="RAJ" or k=="DECJ":
+		str_prefix = ":".join(list_dict_parfiles[i][k][0].split(":")[:-1]) + ":" 
+                if str_prefix.startswith("-"): str_prefix = str_prefix.replace("-", "$-$")
+		#print "str_prefix = ", str_prefix
+		str_value  = list_dict_parfiles[i][k][0].split(":")[-1]
+		#print "str_value = ", str_value
+		
+		str_tens   = str_value.split(".")[0][:-1] 
+		str_prefix = str_prefix + str_tens
+		#print "str_tens = ", str_tens
+		#print "str_prefix = ", str_prefix
+		str_value = str_value[1:]
+		
+
+		
+		#print "str_prefix_final = ", str_prefix
+		#print "str_value_final = ", str_value
+                
+		flag_scientific_notation = 0
+
+        elif list_dict_parfiles[i][k][2] == "*":
+                try:    string_param_value = make_string_value(list_dict_parfiles[i][k][0])
+                except: string_param_value = list_dict_parfiles[i][k][0]
+        
+            
+	elif list_dict_parfiles[i][k][2] != "-":
+                #print
+                #print "k = ", k
+                #print list_dict_parfiles[i][k]
+		try:
+			#print "Passing flag_scientific_notation = ", flag_scientific_notation
+                        #print "str_prefix = ", str_value, "    ", str_err 
+			string_param_value = str_prefix + make_string_value_with_err(str_value, str_err, flag_scientific_notation)
+                        
+
+		except ValueError:
+			
+			#print "%s, %s: Couldn't convert to float!" % (k, str_value)
+			string_param_value = list_dict_parfiles[i][k][0]
+	
+		#print "string_param_value = %s" % (string_param_value)
+        else:
+                string_param_value = list_dict_parfiles[i][k][0]
+
+	list_dict_latex_strings[i][k] = string_param_value
+
+        #print "str_err = ", str_err
+	#print "%20s: %50s ----> %40s" % (k, str_value+" +-  "+str_err, list_dict_latex_strings[i][k])
+
+
+
+string_pulsar_names = ""
+for i in range(N_parfiles):
+        try:
+                string_pulsar_names = string_pulsar_names + " &   %-70s" % (list_dict_latex_strings[i]["PSR"])
+        except:
+                string_pulsar_names = string_pulsar_names + " &   %-70s" % (list_dict_latex_strings[i]["PSRJ"])
+print
+print
+print "========================================================"
+print
+print "\\begin{table*}"
+print "\\begin{center}{\\scriptsize"
+print "\\setlength{\\tabcolsep}{6pt}"
+print "\\renewcommand{\\arraystretch}{1.3}"
+print "\\begin{tabular}{l%s}" % (" c"*N_parfiles) 
+print "\\hline"
+print "Pulsar %s \\\\" % (string_pulsar_names)
+print "\\hline\\hline"
+
+
+
+
+list_keys_not_reported = []
+for k in list_ordered_params_general_no_PSR:
+
+    flag_print_param = 0
+
+    if (k in dict_parameters_descriptions.keys() ):
+        string_to_print = "%-70s\\dotfill" % (dict_parameters_descriptions[k])
+        for i in range(N_parfiles):
+            if (k in list_dict_latex_strings[i]):
+                flag_print_param = 1
+                string_to_print = string_to_print + " &   %-70s" % (list_dict_latex_strings[i][k])
+            else:
+                string_to_print = string_to_print + " &   %-70s" % ("--")
+            
+        string_to_print = string_to_print + " \\\\"
+        if (flag_print_param == 1):
+            print string_to_print
+        else:
+            list_keys_not_reported.append(k)
+
+    
+
+print "\\hline"
+print "\\multicolumn{%d}{c}{Binary Parameters}  \\\\" % (1+N_parfiles)
+print "\\hline\\hline"
+
+
+for k in list_ordered_params_binary:
+    flag_print_param = 0
+
+    if (k in dict_parameters_descriptions.keys() ):
+        string_to_print = "%-70s\\dotfill" % (dict_parameters_descriptions[k])
+        for i in range(N_parfiles):
+            if (k in list_dict_latex_strings[i]):
+                flag_print_param = 1
+                string_to_print = string_to_print + " &   %-70s" % (list_dict_latex_strings[i][k])
+            else:
+                string_to_print = string_to_print + " &   %-70s" % ("--")
+
+        string_to_print = string_to_print + " \\\\"
+        if (flag_print_param == 1):
+            print string_to_print
+        else:
+            list_keys_not_reported.append(k)
+
+
+print "\\hline"
+print "\\multicolumn{%d}{c}{Derived Parameters}  \\\\" % (1+N_parfiles)
+print "\\hline\\hline"
+for k in list_ordered_params_derived:
+    flag_print_param = 0
+    if (k in dict_parameters_descriptions.keys() ):
+        #print k
+        string_to_print = "%-70s\\dotfill" % (dict_parameters_descriptions[k])
+        for i in range(N_parfiles):
+            if (k in list_dict_latex_strings[i]):
+                flag_print_param = 1
+                string_to_print = string_to_print + " &   %-70s" % (list_dict_latex_strings[i][k])
+            else:
+                string_to_print = string_to_print + " &   %-70s" % ("--")
+
+        string_to_print = string_to_print + " \\\\"
+        if (flag_print_param == 1):
+            print string_to_print
+        else:
+            list_keys_not_reported.append(k)
+                                                                        
+
+            
+print "\\hline"
+print "\\end{tabular} }"
+print "\\end{center} "
+print "\\label{tab:timing_solution_%s}" % ("_".join(list_parfiles))
+print "\\end{table*}"
+
+if len(list_keys_not_reported) > 0:
+	print
+	print "========================================================"
+	print "WARNING: the following parameters were not reported:"
+	for i in range(len(list_keys_not_reported)):
+		print list_keys_not_reported[i], 
+exit()

@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob
+import random, time, gc, imp
+import numpy as np
+import subprocess
+
+import psrchive
+
+#ARGOMENTI DA SHELL
+string_version = "1.0-beta1 (12Nov2017)"
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+    print "Usage: %s -e newext -source \"*.clean\" -dest \"*.ar\"" % (os.path.basename(sys.argv[0])) 
+    exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+    print "Version: %s" % (string_version)
+    exit()
+else:
+    for j in range( 1, len(sys.argv)):
+        if (sys.argv[j] == "-source"):
+            string_files_source = sys.argv[j+1]
+            if ("*" in string_files_source) or ("?" in string_files_source):
+                list_files_source = sorted(glob.glob(string_files_source.strip("\"")))
+            else:
+                list_files_source = string_files_source.replace(" ","").split(",")
+            N_files_source = len(list_files_source)
+
+        elif (sys.argv[j] == "-dest"):
+            string_files_dest = sys.argv[j+1]
+            if ("*" in string_files_dest) or ("?" in string_files_dest):
+                list_files_dest = sorted(glob.glob(string_files_dest.strip("\"")))
+            else:
+                list_files_dest = string_files_dest.replace(" ","").split(",")
+            N_files_dest = len(list_files_dest)
+        elif (sys.argv[j] == "-e"):
+            new_ext = sys.argv[j+1]
+            
+
+
+print
+print "#"*62
+print "#" + " "*14 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*14 + "#"
+print "#"*62
+print
+
+
+if (N_files_source != N_files_dest):
+    print
+    print "ERROR: the number of source files (%d) does not match the number of destination files (%d)!" % (N_files_source, N_files_dest)
+    exit()
+
+
+for i in range(N_files_source):
+    print "%50s   ----->  %-50s" % (list_files_source[i], list_files_dest[i])
+
+print
+flag_proceed = raw_input("Proceed? (y/n): ")
+
+if flag_proceed == 'y' or flag_proceed == 'Y': 
+    for i in range(N_files_source):
+
+        source = list_files_source[i]
+        dest = list_files_dest[i]
+    
+    
+        ar_source = psrchive.Archive_load( source )
+
+        nsub = ar_source.get_nsubint()
+        nchan = ar_source.get_nchan()
+
+        flag_found_nonempty_subint = 0
+        
+        list_subint_to_zap = []
+
+        weights = ar_source.get_weights()
+        for i in range(0,nsub):
+            if np.count_nonzero(weights[i]) == 0:  #if the values are all zero
+                list_subint_to_zap.append(i)
+            elif flag_found_nonempty_subint == 0:
+                index_nonempty_subint = i
+                flag_found_nonempty_subint == 1
+                
+        
+        array_weights = ar_source.get_weights()[index_nonempty_subint]
+        list_channels_to_zap = np.where( array_weights == 0)[0]
+    
+        cmd_paz = 'paz -z "%s" -w "%s" -e %s %s' % (' '.join( [str(x) for x in list_channels_to_zap]), ' '.join( [str(x) for x in list_subint_to_zap]), new_ext, dest)
+        print
+        print cmd_paz
+
+        os.system(cmd_paz)
+
+    

@@ -1,0 +1,504 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob, shutil
+import numpy as np
+import subprocess
+
+
+BOLD = '\033[1m'
+END = '\033[0m'
+
+def get_command_output(command):
+    list_for_Popen = command.split()
+    proc = subprocess.Popen(list_for_Popen, stdout=subprocess.PIPE)
+    out, err = proc.communicate()
+    return out
+
+
+
+def append_RM_result(archive_name, outfilename, RM, RMerr):
+    outfile = open(outfilename, "a")
+
+    mjd = get_command_output(  "vap -n -c mjd %s" % (archive_name)   ).split()[-1]
+
+    outfile.write("%s \t %s \t %s \t %s\n"   % (archive_name, mjd, RM, RMerr))
+    outfile.close()
+
+
+def derotate(file_calibrated_pulsar, RM, pavopt=""):
+    ext_file_calibrated_pulsar = os.path.splitext(file_calibrated_pulsar)[1]
+    cmd_derotate_RM = "pam -e %s.RM%+5.2f -R %s %s" % (ext_file_calibrated_pulsar, np.float(RM),  RM, file_calibrated_pulsar)
+    file_derotated_pulsar = "%s.RM%+5.2f" % (file_calibrated_pulsar, np.float(RM))
+    print "Derotating with RM %.2f rad (%s)..." % (np.float(RM), cmd_derotate_RM)
+    os.system( cmd_derotate_RM )
+    print "done!"
+
+def get_RM_with_rmfit(calibrated_pulsar_archive, algorithm=1, arg=["-1000","1000","300"]):
+    if algorithm==1:
+        cmd_rmfit = "rmfit -D -K rmfit_%s_m.ps/CPS -m %s -L -r %s" % (calibrated_pulsar_archive, ",".join(arg), calibrated_pulsar_archive)
+        print "cmd_rmfit = ", cmd_rmfit
+        if os.path.exists("rmfit.out"):
+                os.remove("rmfit.out")
+
+                os.system(cmd_rmfit)
+        proc_gv = subprocess.Popen(['gv', '-orientation=landscape', "rmfit_%s_m.ps" % calibrated_pulsar_archive])
+
+        file_results = open("rmfit.out", 'r')
+        list_lines = []
+        for line in file_results:
+            list_lines.append(line)
+            index_RM = list_lines[0].split().index("RM")
+            index_RM_err = list_lines[0].split().index("RM_err")
+
+        RM = np.float(list_lines[1].split()[index_RM])
+        RM_err = np.float(list_lines[1].split()[index_RM_err])
+
+
+
+
+
+def pol_calibrate(file_pulsar_archive, file_pulsar_cal):
+    if os.path.splitext(file_pulsar_cal)[1] != ".pcal":
+        print "File %s does not have the right extension" % (file_pulsar_cal)
+        print "Changing %s into %s.pcal..." % (file_pulsar_cal, os.path.splitext(file_pulsar_cal)[0]),
+        new_pulsarcal_name = os.path.splitext(file_pulsar_cal)[0]+".pcal"
+        os.rename( file_pulsar_cal,  new_pulsarcal_name)
+        file_pulsar_cal = new_pulsarcal_name
+        print "done!"
+
+
+    #cmd_create_database = "pac -w -p %s" % (path_to_search)                                                                                                                         
+    #cmd_calibrate_pulsar = "pac -u fluxcal -d /media/part4/NGC7078/data_PUPPI/pcal_all/database.txt -A %s %s" % (file_pulsar_cal, file_pulsar_archive)                              
+    cmd_calibrate_pulsar = "pac -u -A %s %s" % (file_pulsar_cal, file_pulsar_archive)
+    print cmd_calibrate_pulsar
+    #os.system( cmd_create_database )                                                                                                                                                
+    os.system( cmd_calibrate_pulsar )
+
+
+
+def set_data_state_Stokes(archive, flag_overwrite=1, newext=".Stokes"):
+        if flag_overwrite==1:
+                cmd_pam = "pam -q -m -S %s" % ( archive )
+        elif flag_overwrite==0:
+                cmd_pam = "pam -q -S -e %s %s" % ( newext, archive )
+        os.system( cmd_pam )
+        return cmd_pam
+
+def set_data_state_Coherence(archive, flag_overwrite=1, newext=".Stokes"):
+        if flag_overwrite==1:
+                cmd_pam = "pam -m --S %s" % ( archive )
+        elif flag_overwrite==0:
+                cmd_pam = "pam --S -e %s %s" % ( newext, archive )
+        os.system( cmd_pam )
+        return cmd_pam
+
+def pazi(archive, flag_print_cmd=False):
+    cmd_pazi = ["pazi", archive]
+    p = subprocess.Popen( cmd_pazi, stdout=subprocess.PIPE)
+    p.wait()
+
+def scrunch(scrunch_string, newext, archive):
+        cmd_pam = "pam %s -e %s %s" % (scrunch_string, newext, archive)
+        print cmd_pam
+        os.system( cmd_pam )
+
+def pacv(calfile, flag_print_cmd=False):
+        obs_type = get_command_output(  "psrstat -Q -c type %s" % (calfile)   ).split()[1]
+        if obs_type == "PolnCal":
+                cmd_pacv = "pacv -D /XS %s" % (calfile)
+                os.system(cmd_pacv)
+        else:
+                print "ERROR: the file type is \"%s\". To be opened with pacv, you need a \"PolnCal\" type file!" % (obs_type)
+
+
+
+def show_steps(current_step):
+    list_steps_beginstring = ['  '] * 8
+    list_steps_endstring = ['  '] * 8
+        
+    list_steps_beginstring[current_step] = BOLD + ">>"
+    list_steps_endstring[current_step] = END
+    
+    
+    print
+    print "========================================================="
+    print "  %2s 0. Check the header parameters %s" % ( list_steps_beginstring[0], list_steps_endstring[0])
+    print "  %2s 1. Check the archive to calibrate %s" % ( list_steps_beginstring[1], list_steps_endstring[1])
+    print "  %2s 2. Check/Clean the calibrator (noise diode) file %s" % ( list_steps_beginstring[2], list_steps_endstring[2])
+    print "  %2s 3. Calibrate %s" % ( list_steps_beginstring[3], list_steps_endstring[3])
+    print "  %2s 4. Clean the calibrated (.calibP) file %s" % ( list_steps_beginstring[4], list_steps_endstring[4])
+    print "  %2s 5. Measure the Rotation Measure %s" % ( list_steps_beginstring[5], list_steps_endstring[5])
+    print "  %2s 6. Derotate (de-Faraday) for the measured RM %s" % ( list_steps_beginstring[6], list_steps_endstring[6])
+    print "  %2s 7. Check the result %s" % ( list_steps_beginstring[7], list_steps_endstring[7])
+    print "========================================================="
+    print
+    return 
+
+
+
+def ask_for_operation(current_step, archive, file_pulsar_cal, RM):
+
+
+    
+    if current_step == 0 :
+        print "  %-12s -> Show relevant file header info" % ("h")
+        print "  %-12s -> Change data state to \"Stokes\"" % ("s")
+        print "  %-12s -> Change data state to \"Coherence\"" % ("c")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 1 :
+        print "  %-12s -> Show relevant file header info" % ("h")
+        print "  %-12s -> Open the archive with pazi for preliminary inspection" % ("p")
+        print "  %-12s -> Time scrunch or set number of subint" % ("T | tX | sN")
+        print "  %-12s -> Frequency scrunch or set number of channels" % ("F | fX | cN")
+        print "  %-12s -> Bin scrunch or set number of bins" % ("    bX | nN")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 2 :
+        print "  %-12s -> Open the calibrator file (%s) with pazi for inspection" % ("p", file_pulsar_cal)
+        print "  %-12s -> View the calibrator file (%s) with pacv for inspection" % ("v", file_pulsar_cal)
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 3 :
+        print "  %-12s -> Calibrate in polarization with \"pac\"" % ("c")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 4 :
+        print "  %-12s -> Open the calibrated archive (.calibP) to clean it with \"pazi\"" % ("p")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 5 :
+        print "  %-12s -> Measure the RM with \"rmfit -m RMmin,RMmax,Nstep -r\"" % ("r1 RMmin,RMmax,Nstep")
+        print "  %-12s -> Measure the RM with \"rmfit -w start_phase,end_phase\"" % ("r2 start_phase,end_phase")
+        print "  %-12s -> Measure the RM with \"code3\" (NOT IMPLEMENTED)" % ("r3")
+        print "  %-12s -> Measure the RM with \"all codes\" (NOT IMPLEMENTED)" % ("r123")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 6 :
+        print "  %-12s -> Derotate for the measured RM (%.2f)" % ("d", RM)
+        print "  %-12s -> Derotate for the specified RM" % ("rm [RM]")
+        print "  %-12s -> Go to next step" % ("x")
+    elif current_step == 7 :
+        print "  %-12s -> Compare the original and derotated archive with \"pav\"" % ("v")
+        print "  %-12s -> Go to next step" % ("x")
+    
+    string_operation = raw_input("Operation: ")
+    return string_operation
+
+
+def show_header_info(archive):
+    nbin,nsub,nchan,npol, telescope_name,receiver_name,backend_phase,downconversion,feed_basis,feed_hand,symmetry_angle,calibrator_phase,data_state = get_command_output(  "psrstat -Q -c nbin,nsubint,nchan,npol,site,rcvr:name,be:phase,be:dcc,rcvr:basis,rcvr:hand,rcvr:sa,rcvr:rph,state %s" % (archive)   ).split()[1:]
+    print
+    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    print "%20s:  %s" % ("nbin", nbin)
+    print "%20s:  %s" % ("nsub", nsub)
+    print "%20s:  %s" % ("nchan", nchan)
+    print "%20s:  %s" % ("npol", npol)
+    print "%20s:  %s" % ("Data State", data_state)
+    print "%20s:  %s" % ("Telescope", telescope_name)
+    print "%20s:  %s" % ("Receiver", receiver_name)
+    print "%20s:  %s" % ("Backend Phase", backend_phase)
+    print "%20s:  %s" % ("Down Conversion", downconversion)
+    print "%20s:  %s" % ("Feed Basis", feed_basis)
+    print "%20s:  %s" % ("Feed Hand", feed_hand)
+    print "%20s:  %s" % ("Symmetry Angle", symmetry_angle)
+    print "%20s:  %s" % ("Calibrator Phase", calibrator_phase)
+    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    print
+    print "Check the all the values are correct for the telescope and receiver used!"
+    print
+    
+
+def do_operation(current_step, string_operation, original_archive, archive, file_pulsar_cal, RM, RM_err, newext):
+    list_str_op = string_operation.split()
+    str_op = ''.join(list_str_op)
+    flag_show_steps = 0
+    
+    if (str_op[0] == "x" or str_op[0] == "x"):
+        flag_show_steps = 1
+        return flag_show_steps, archive, file_pulsar_cal, current_step+1, RM, RM_err
+    
+    else:
+        
+        if current_step == 0 :
+            if (str_op[0] == "h" or str_op[0] == "H"):
+                show_header_info(archive)
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+            
+            elif (str_op[0] == "s" or str_op[0] == "S"):
+                print
+                print "Running: ", set_data_state_Stokes(archive, flag_overwrite=0, newext=newext)
+                print
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+            elif (str_op[0] == "c" or str_op[0] == "C"):
+                print
+                print "Running: ", set_data_state_Coherence(archive, flag_overwrite=0, newext=newext)
+                print
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                return flag_show_steps,  new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+            else:
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+
+
+        elif current_step == 1 :
+            if (str_op[0] == "h" or str_op[0] == "H"):
+                show_header_info(archive)
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+                                            
+            elif (str_op[0] == "p" or str_op[0] == "P"):
+                pazi(archive)
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % ("pazi")
+            
+                try:
+                    os.rename(archive+".pazi", new_archive_name)
+                    return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+                except:
+                    return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+
+            elif ("F" in str_op) or ("f" in str_op) or ("T" in str_op) or ("t" in str_op) or ("C" in str_op) or ("c" in str_op) or ("S" in str_op) or ("s" in str_op) or ("N" in str_op) or ("n" in str_op) or ("B" in str_op) or ("b" in str_op):
+                str_schunch = ""
+                for entry in list_str_op:
+                    if ("F" in entry):
+                        str_schunch = str_schunch + "-F "
+                    elif ("f" in entry):
+                        f_scrunch_factor = int(entry.split("f")[-1])
+                        str_schunch = str_schunch + "-f%d " % (f_scrunch_factor)
+                        
+                    elif ("T" in entry):
+                        str_schunch = str_schunch + "-T "
+                    elif ("t" in entry):
+                        t_scrunch_factor = int(entry.split("t")[-1])
+                        str_schunch = str_schunch + "-t%d " % (t_scrunch_factor)
+                        
+                    elif "c" in entry:
+                        nchan = int(entry.split("c")[-1])
+                        str_schunch = str_schunch + "--setnchn %d " % (nchan)
+                    elif "C" in entry:
+                        nchan = int(entry.split("C")[-1])
+                        str_schunch = str_schunch + "--setnchn %d " % (nchan)
+
+                    elif "s" in entry:
+                        nsub = int(entry.split("s")[-1])
+                        str_schunch = str_schunch + "--setnsub %d " % (nsub)
+                    elif "S" in entry:
+                        nsub = int(entry.split("S")[-1])
+                        str_schunch = str_schunch + "--setnsub %d " % (nsub)
+
+                    elif "n" in entry:
+                        nbin = int(entry.split("n")[-1])
+                        str_schunch = str_schunch + "--setnbin %d " % (nbin)
+                    elif "N" in entry:
+                        nbin = int(entry.split("N")[-1])
+                        str_schunch = str_schunch + "--setnbin %d " % (nbin)
+
+                    elif "b" in entry:
+                        b_scrunch_factor = int(entry.split("b")[-1])
+                        str_schunch = str_schunch + "-b %d " % (b_scrunch_factor)
+                    elif "B" in entry:
+                        b_scrunch_factor = int(entry.split("B")[-1])
+                        str_schunch = str_schunch + "-b %d " % (b_scrunch_factor)
+                        
+
+                    scrunch(str_schunch, newext, archive)
+                    new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                    return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+                                                                                                                                    
+
+
+            elif (str_op[0] == "x" or str_op[0] == "X"):
+                return flag_show_steps, archive, file_pulsar_cal, current_step+1, RM, RM_err
+        
+
+        elif current_step == 2 :
+            if (str_op[0] == "p" or str_op[0] == "P"):
+                pazi(file_pulsar_cal)
+                new_calfile_name = os.path.splitext(file_pulsar_cal)[0] + ".%s" % (newext)
+                try:
+                    os.rename(file_pulsar_cal+".pazi", new_calfile_name)
+                    return flag_show_steps, archive, new_calfile_name, current_step, RM, RM_err
+                except:
+                    return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+
+            elif (str_op[0] == "v" or str_op[0] == "v"):
+                pacv(file_pulsar_cal)
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+
+                
+        elif current_step == 3 :
+            if (str_op[0] == "c" or str_op[0] == "C"):
+                flag_show_steps = 1
+                pol_calibrate(archive, file_pulsar_cal)
+                new_archive_name = os.path.splitext(archive)[0] + ".calibP"
+                new_calfile_name = os.path.splitext(file_pulsar_cal)[0] + ".pcal"
+                return flag_show_steps, new_archive_name, new_calfile_name, current_step+1, RM, RM_err
+                
+        
+        elif current_step == 4 :
+            if (str_op[0] == "p" or str_op[0] == "P"):
+                 pazi(archive)
+                 new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+
+                 try:
+                     os.rename(archive+".pazi", new_archive_name)
+                     return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+                 except:
+                     return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+            return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+                 
+                                                                    
+
+
+            
+        
+        elif current_step == 5 :
+            print str_op
+            if (str_op.startswith("r1") or str_op.startswith("R1")):
+                list_steps = str_op[2:].split(",")
+                RM, RM_err = get_RM_with_rmfit(archive, algorithm=1, arg=list_steps) 
+                print
+                print "RM = %.4f +- %.4f" % (RM, RM_err)
+
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+            elif (str_op.startswith("r2") or str_op.startswith("R2")):
+                list_phases = str_op[2:].split(",")
+                RM, RM_err = get_RM_with_rmfit(archive, algorithm=2, arg=list_phases)
+                print
+                print "RM = %.4f +- %.4f" % (RM, RM_err)
+
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+            
+            
+            
+        elif current_step == 6 :
+
+
+            if (str_op[0] == "d" or str_op[0] == "D"):
+                derotate(archive, RM)
+                new_archive_name = archive + ".RM%+5.2f" % (np.float(RM)) 
+                return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+            elif (str_op.startswith("rm") or str_op.startswith("RM")):
+                RM = np.float(str_op.split("rm")[-1])
+                derotate(archive, RM)
+                new_archive_name = archive + ".RM%+5.2f" % (np.float(RM)) 
+                return flag_show_steps, new_archive_name, file_pulsar_cal, current_step, RM, RM_err
+
+            
+        elif current_step == 7 :
+            if (str_op[0] == "v" or str_op[0] == "V"):
+                cmd_pav = "pav -SFT -N 1,2 %s %s" % (original_archive, archive)
+                print cmd_pav
+                os.system(cmd_pav)
+                return flag_show_steps, archive, file_pulsar_cal, current_step, RM, RM_err
+        
+                                
+
+            
+
+            
+
+
+outfile_name = ""
+pavopt = ""
+new_ext = "newext"
+file_pulsar_cal = ""
+flag_auto = 0
+list_command_strings = []
+list_cals = ["--"]
+start_step = 0 
+
+#ARGOMENTI DA SHELL
+string_version = "1.0-beta1 (12Nov2017)"
+
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+    print "Usage: %s -e newext -ar <pulsar_archive> -cal <pulsar_cal> [-o <outfile_name>] [-auto \"s3 c; s5 r1 -1000,1000,300; s6 d\"] [-start_step 5]" % (os.path.basename(sys.argv[0]))
+    print
+    exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+    print "Version: %s" % (string_version)
+    exit()
+else:
+    for n in range(1, len(sys.argv)-1):
+        if (sys.argv[n] == "-e"):
+            new_ext = sys.argv[n+1]
+        elif (sys.argv[n] == "-ar"):
+            string_archives = sys.argv[n+1]
+            if ("*" in string_archives) or ("?" in string_archives):
+                print string_archives.strip("\"")
+                list_archives = sorted(glob.glob(string_archives.strip("\"")))
+            else:
+                list_archives = string_archives.replace(" ","").split(",")
+            
+        elif (sys.argv[n] == "-cal"):
+            string_cals = sys.argv[n+1]
+            if ("*" in string_cals) or ("?" in string_cals):
+                print string_cals.strip("\"")
+                list_cals = sorted(glob.glob(string_cals.strip("\"")))
+            else:
+                list_cals = string_cals.replace(" ","").split(",")
+                    
+        elif (sys.argv[n] == "-o"):
+            outfile_name = sys.argv[n+1]
+            
+        elif (sys.argv[n] == "-start_step"):
+            start_step = int(sys.argv[n+1])
+        elif (sys.argv[n] == "-auto"):
+            flag_auto = 1
+            list_command_strings = sys.argv[n+1].split(";")
+            list_steps = []
+            list_operations = []
+            for command in list_command_strings:
+                if command.split()[0].startswith("s") and command.split()[0][1].isdigit():
+                    list_steps.append(int(command.split()[0][1]))
+                    list_operations.append(" ".join(command.split()[1:]))
+
+                    
+current_step = start_step
+current_archive = list_archives[0]
+RM = 0
+RM_err = 0
+N_steps = 8
+flag_show_steps = 1
+original_archive = current_archive
+current_calfile = list_cals[0]
+
+if len(list_archives) > len(list_cals):
+    list_cals = [ list_cals[0] ]*len(list_archives)
+    print 
+    
+if flag_auto == 0 :
+    while (current_step < N_steps):
+        print
+        print "---------------------------------------------------------------------------------"
+        print "|%10s:    %-60s    |" % ("ARCHIVE", current_archive)
+        print "|%10s:    %-60s    |" % ("CALFILE", current_calfile)
+        print "---------------------------------------------------------------------------------"
+        print "current_step: %s" % current_step
+        if flag_show_steps == 1:
+            show_steps(current_step)
+
+        try:
+            string_operation = ask_for_operation(current_step, current_archive, current_calfile, RM)
+            flag_show_steps, current_archive, current_calfile, current_step, RM, RM_err = do_operation(current_step, string_operation, original_archive, current_archive, current_calfile, RM, RM_err, new_ext)
+        except TypeError:
+            pass
+
+    if outfile_name != "":
+        append_RM_result(current_archive, outfile_name, RM, RM_err)
+
+
+
+elif flag_auto == 1:
+    for current_archive,current_calfile in zip(list_archives,list_cals):
+        for current_step,string_operation in zip(list_steps,list_operations):
+            original_archive = current_archive
+            print current_step,string_operation
+            try:
+                flag_show_steps, current_archive, current_calfile, current_step, RM, RM_err = do_operation(current_step, string_operation, original_archive, current_archive, current_calfile, RM, RM_err, new_ext)
+            except TypeError:
+                print "ERROR!"
+    
+        if outfile_name != "":
+            append_RM_result(current_archive, outfile_name, RM, RM_err)
+
+                    

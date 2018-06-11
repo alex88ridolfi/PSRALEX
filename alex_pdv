@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob, copy
+import random, time, gc, imp
+import numpy as np
+import subprocess
+
+import psrchive
+import pylab as plt
+
+
+"""
+Alessandro Ridolfi, Bonn, January 2017
+"""
+
+flag_normalize = 0
+nbin_requested = 0
+flag_unbias_L = 0
+string_version = "1.0-beta1 (12Nov2017)"
+
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+        print "USAGE: %s -ar \"*.ar\" [-normalize] [-unbias_L \"offpulse_phase_start,offpulse_phase_end\" -nbin N]" % (os.path.basename(sys.argv[0]))
+        exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+        for j in range( 1, len(sys.argv)):
+                if (sys.argv[j] == "-ar"):
+                        string_files = sys.argv[j+1]
+                        if ("*" in string_files) or ("?" in string_files):
+                                print string_files.strip("\"")
+                                list_files = sorted(glob.glob(string_files.strip("\"")), key=lambda s: s.lower())
+                        else:
+                                list_files = string_files.replace(" ","").split(",")
+                                N_files = len(list_files)
+                elif (sys.argv[j] == "-normalize"):
+                        flag_normalize = 1
+                elif (sys.argv[j] == "-unbias_L"):
+                        flag_unbias_L = 1
+                        phase_start,phase_end = [ np.float(x) for x in sys.argv[j+1].split(",") ]
+                        
+                elif (sys.argv[j] == "-nbin"):
+                        nbin_requested = int(sys.argv[j+1])
+
+
+
+
+for i in range(len(list_files)):
+        archive_name = list_files[i]
+        
+
+list_profiles = []
+
+list_dates = []
+for i in range(len(list_files)):
+        archive_name = list_files[i]
+        archive_basename = os.path.splitext(archive_name)[0]
+
+        ar = psrchive.Archive_load( archive_name )
+
+        npol = ar.get_npol()
+        nbin = ar.get_nbin()
+        
+        if npol ==4: 
+                ar.convert_state('Stokes')
+        
+        ar.tscrunch()
+        ar.fscrunch()
+
+        if nbin_requested == 0:
+                nbin_requested = nbin
+        elif nbin > nbin_requested:
+                ar.bscrunch_to_nbin(int(nbin_requested))
+                nbin = int(nbin_requested)
+                
+        ar.remove_baseline()
+
+
+        prof = ar.get_Profile(0,0,0);     I = prof.get_amps()
+
+        if npol ==4:
+                prof = ar.get_Profile(0,1,0);     Q = prof.get_amps()
+                prof = ar.get_Profile(0,2,0);     U = prof.get_amps()
+                prof = ar.get_Profile(0,3,0);     V = prof.get_amps()
+                
+                L = np.sqrt(Q*Q + U*U)
+                #print 1, np.amax(I), np.amax(Q), np.amax(U), np.amax(V), np.amax(L)
+                PA_deg = 0.5 * np.arctan(U/Q) * 180./np.pi
+                
+        if flag_normalize == 1:
+                I_norm = copy.deepcopy(I / np.amax(I))
+                
+
+                if npol ==4:
+                        Q_norm = copy.deepcopy(Q / np.amax(I))
+                        U_norm = copy.deepcopy(U / np.amax(I))
+                        V_norm = copy.deepcopy(V / np.amax(I))
+                        L_norm = copy.deepcopy(L / np.amax(I))
+                        #L_norm = np.sqrt(Q_norm*Q_norm + U_norm*U_norm)
+
+
+                        Q = copy.deepcopy(Q_norm)
+                        U = copy.deepcopy(U_norm)
+                        V = copy.deepcopy(V_norm)
+                        L = copy.deepcopy(L_norm)
+
+                        I = copy.deepcopy(I_norm)
+                        
+                        #print L[:]
+                        
+                        PA_deg = 0.5 * np.arctan(U/Q) * 180./np.pi
+                else:
+                        Q = np.zeros(I.shape)
+                        U = np.zeros(I.shape)
+                        V = np.zeros(I.shape)
+                        L = np.zeros(I.shape)
+                        PA_deg = np.zeros(I.shape)
+
+        if flag_unbias_L == 1:
+                index_start = nbin*phase_start
+                index_end   = nbin*phase_end
+                L_mean_offpulse = np.mean(L[index_start:index_end])
+                #print L[index_start:index_end]
+                #print L_mean_offpulse
+                L = copy.deepcopy(L - L_mean_offpulse) 
+                
+        #print 2, np.amax(I_norm), np.amax(Q_norm), np.amax(U_norm), np.amax(V_norm), np.amax(L_norm)
+
+
+        #plt.plot(I); plt.plot(L); plt.show()
+        
+
+
+
+        
+
+        outfile_name = "profile_pol_%s.txt" % (archive_basename)
+        outfile = open(outfile_name, "w")
+        list_profiles.append(outfile_name)
+
+        outfile.write("Pulse_Phase          I          Q          U          V          L          P.A. (deg)\n")
+        for n in range(int(nbin)):
+                outfile.write("%.4f          %.10f          %.10f          %.10f          %.10f          %.10f          %.3f\n" % (n /np.float(nbin), I[n], Q[n], U[n], V[n], L[n], PA_deg[n]) )
+        outfile.close()
+        
+

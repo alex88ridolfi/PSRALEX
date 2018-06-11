@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+
+#################### ALESSANDRO RIDOLFI ########################
+#                     Version 1.0-beta1                        #
+#                    Bonn, November 2017                       #
+################################################################
+
+
+import sys, os, os.path, glob
+import numpy as np
+
+#ALL CONSTANTS IN CGS UNITS
+LIGHT_SPEED                                     = 2.99792458e10
+G                                               = 6.67259e-8
+M_SUN_CGS                                       = 1.989e33
+R_SUN_CGS                                       = 6.955e10
+
+def import_parfile( infile ):
+        parfile = open( infile, "r" )
+        dict_parfile = {}
+
+        for line in parfile:
+                if line != "\n":
+                        split_line = line.split()
+                        dict_parfile[ split_line[0] ] = split_line[1]
+                        if "D-" in dict_parfile[ split_line[0] ]:
+                                dict_parfile[ split_line[0] ] = dict_parfile[ split_line[0] ].replace("D-", "e-")
+
+        return dict_parfile
+
+
+
+def calculate_roche_lobe_of_companion_in_cm_with_Eggleton(a_cm, Mp_Msun, Mc_Msun):
+        q = float(Mc_Msun) / float(Mp_Msun)
+        Roche_radius_cm = a_cm * 0.49 * np.power(q, 2./3.)   / (0.6* np.power(q, 2./3.)   +   np.log(1 + np.power(q, 1./3)))
+        return Roche_radius_cm
+
+
+def calculate_mass_function_from_PB_and_A1(Pb_days, xp_lts):
+        Pb_s = Pb_days*86400.
+        ap_cm = xp_lts * LIGHT_SPEED
+        f_Mp_grams = (4*np.power(np.pi, 2.) / G ) * (np.power(ap_cm, 3.)  / np.power(Pb_s, 2.)\
+)
+        return f_Mp_grams
+
+
+def solve_mass_function_for_Mc_from_f_Mp(inc_rad, f_Mp_Msun, Mp_Msun=1.4):
+        Mc_Msun_min  = f_Mp_Msun
+        K = f_Mp_Msun / ( np.power( np.sin(inc_rad), 3 ) )              #costante K                        
+
+        x_n1            = Mc_Msun_min #parto dalla x estremo inferiore del range possibile di Mc           
+        x_n             = Mc_Msun_min +1   #valore a a buffo                                               
+        count = 0
+
+
+        while ( abs(x_n1 - x_n) > 1.0e-6 ):
+                count = count +1
+                x_n = x_n1
+                y_xn                    =  (x_n**3) / ( (Mp_Msun +x_n)**2 ) -  K
+                y_derivative_xn         =  3*(x_n**2) /  ((Mp_Msun +x_n)**2 ) -2*(x_n**3) /  ( (Mp_Msun +x_n)**3 )
+
+                x_n1 = x_n - ( y_xn / y_derivative_xn )
+
+
+        return x_n1
+
+
+
+parfile_name = ""
+flag_allinc = 0
+Delta_Phi_orb =0
+Mp_assumed_Msun = 1.4
+
+#ARGOMENTI DA SHELL              
+string_version = "1.0-beta1 (12Nov2017)"
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+        print "USAGE: %s { -Pb [d] -xp [ls]  |   -par <parfile> } [-Mp Msun] [-allinc]" % (os.path.basename(sys.argv[0]))
+        print
+        exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print "Version: %s" % (string_version)
+        exit()
+else:
+    for n in range(1, len(sys.argv)):
+        if (sys.argv[n] == "-Pb"):
+            Pb_d = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-xp"):
+            xp_lts = np.float(sys.argv[n+1])
+        elif (sys.argv[n] == "-par"):
+            parfile_name = sys.argv[n+1]
+        elif (sys.argv[n] == "-allinc"):
+            flag_allinc = 1
+        elif (sys.argv[n] == "-Mp"):
+            Mp_assumed_Msun = np.float(sys.argv[n+1])
+
+if parfile_name == "":
+    Pb_s = Pb_d*86400
+    xp_cm = xp_lts * LIGHT_SPEED
+else:
+    dict_parfile = import_parfile(parfile_name)
+    try:
+        Pb_days = np.float(dict_parfile['PB'])
+        Pb_s = np.float(dict_parfile['PB']) * 86400
+    except KeyError:
+        Pb_s = 1. / np.float(dict_parfile['FB0'])
+        Pb_days = Pb_s/86400.
+    xp_lts = np.float(dict_parfile['A1'])
+    xp_cm = xp_lts * LIGHT_SPEED
+    
+
+
+f_Mp_grams = calculate_mass_function_from_PB_and_A1(Pb_days, xp_lts)
+f_Mp_Msun = f_Mp_grams / M_SUN_CGS
+
+
+
+print "%30s = %.4e Msun" % ("Pulsar mass function, f(Mp)", f_Mp_Msun)
+print
+if flag_allinc == 0:
+    Mc_Msun_90deg = solve_mass_function_for_Mc_from_f_Mp(inc_rad=90*np.pi/180., f_Mp_Msun=f_Mp_Msun, Mp_Msun=Mp_assumed_Msun)
+    Mc_Msun_60deg = solve_mass_function_for_Mc_from_f_Mp(inc_rad=60*np.pi/180., f_Mp_Msun=f_Mp_Msun, Mp_Msun=Mp_assumed_Msun)
+
+    print "%30s, Mp = %.2f Msun) = %7.4f Msun" % ("Minimum Mc (inc=90 deg", Mp_assumed_Msun, Mc_Msun_90deg)
+    print "%30s, Mp = %.2f Msun) = %7.4f Msun" % ("Median Mc (inc=60 deg", Mp_assumed_Msun, Mc_Msun_60deg)
+
+elif flag_allinc == 1:
+    print "====================="*10
+    print "%18s %18s %18s %18s %18s %18s %18s %18s %18s %18s" % ("Mp (Msun, assumed)", "inc (deg)", "---> Mc (Msun)", "q (Mp/Mc)", "a_p (Rsun)", " + a_c (Rsun)", "= a (Rsun)", "RL_comp (Rsun)", " + RL_pulsar (Rsun)", "= RLc + RLp (Rsun)")
+    print "====================="*10
+    for i in range(5, 91, 5):
+        inc_rad = i *np.pi/180
+        Mc_Msun = solve_mass_function_for_Mc_from_f_Mp(inc_rad=inc_rad, f_Mp_Msun=f_Mp_Msun, Mp_Msun=Mp_assumed_Msun)
+        ap_cm = xp_cm / np.sin(inc_rad)
+        ac_cm = ap_cm * (Mp_assumed_Msun/Mc_Msun)
+        a_cm = ap_cm + ac_cm
+
+        
+        q = Mp_assumed_Msun / Mc_Msun
+
+        RL_comp = calculate_roche_lobe_of_companion_in_cm_with_Eggleton(a_cm, Mp_assumed_Msun, Mc_Msun)/R_SUN_CGS
+        RL_pulsar = calculate_roche_lobe_of_companion_in_cm_with_Eggleton(a_cm, Mc_Msun, Mp_assumed_Msun)/R_SUN_CGS
+
+
+        print "%18.2f %18.2f %18.4f %18.4f %18.3f %18.3f %18.3f %18.3f %18.3f %18.3f" % (Mp_assumed_Msun, i, Mc_Msun, q, ap_cm/R_SUN_CGS, ac_cm/R_SUN_CGS, a_cm/R_SUN_CGS,  RL_comp, RL_pulsar, RL_comp+RL_pulsar)
