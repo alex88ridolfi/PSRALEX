@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
 #                     Version 1.0-beta1                        #
@@ -7,40 +7,72 @@
 
 
 import sys, os, os.path, glob
-import numpy as np
+
 
 #ARGOMENTI DA SHELL
-string_version = "1.0-beta1 (12Nov2017)"
+string_version = "1.2 (28Oct2018)"
+flag_force = 0
+
+if "-f" in sys.argv:
+        sys.argv.remove("-f")
+        flag_force = 1
+
+
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-   print "USAGE: %s oldstring newstring" % (os.path.basename(sys.argv[0]))
-   exit()
+        print("USAGE1: %s oldstring newstring [-f]" % (os.path.basename(sys.argv[0])))
+        print("USAGE2: %s -old \"oldstring\" -new \"newstring\" -files \"<files*.ar>\" [-f]" % (os.path.basename(sys.argv[0])))
+        print()
+        print(" -f: force the changes without asking for confirmation")
+        exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-   print "Version: %s" % (string_version)
-   exit()
-
-oldstring = sys.argv[1]
-newstring = sys.argv[2]
-
-
-list_old_filenames = glob.glob("*%s*" % (oldstring) )
-list_new_filenames = [f.replace(oldstring, newstring) for f in list_old_filenames]
-
-lenght_max_old_filenames = np.amax([len(x) for x in list_old_filenames] )
-print
-print "#"*62
-print "#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#"
-print "#"*62
-print
+        print("Version: %s" % (string_version))
+        exit()
+elif len(sys.argv) == 3:
+        oldstring = sys.argv[1]
+        newstring = sys.argv[2]
+        list_old_filenames = glob.glob("*%s*" % (oldstring) )
 
 
-print "These files will be renamed as follows:"
-print
+elif len(sys.argv) > 3:
+        for j in range( 1, len(sys.argv)):
+                if (sys.argv[j] == "-old"):
+                        oldstring = sys.argv[j+1]
+                elif (sys.argv[j] == "-new"):
+                        newstring = sys.argv[j+1]
+                elif  (sys.argv[j] == "-files"):
+                        string_files = sys.argv[j+1]
+                        if ("*" in string_files) or ("?" in string_files):
+                                print(string_files.strip("\""))
+                                list_old_filenames = list(filter(lambda x: oldstring in x, sorted(glob.glob(string_files.strip("\""))) ))
+                        else:
+                                list_old_filenames = list(filter(lambda x: oldstring in x, string_files.replace(" ","").split(",")))
+
+
+list_new_filenames = [f.replace(oldstring, newstring) for f in list_old_filenames]                   
+
+if len(list_new_filenames) == 0:
+        print("ERROR: No files in the current directory has '%s' in their names! Exiting..." % (oldstring))
+        exit()
+
+length_max_old_filenames = max([len(x) for x in list_old_filenames] )
+print()
+print("#"*62)
+print("#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#")
+print("#"*62)
+print()
+
+
+print("These files will be renamed as follows:")
+print()
 for i in range(len(list_old_filenames)):
-   print "%-*s   --->   %-s " % (lenght_max_old_filenames, list_old_filenames[i], list_new_filenames[i])
+        print("%-*s   --->   %-s " % (length_max_old_filenames, list_old_filenames[i], list_new_filenames[i]))
 
-print
-a = raw_input("Proceed? (y/n): ")
+print()
+if flag_force == 0:
+        a = input("Proceed? (y/n): ")
+elif flag_force == 1:
+        a = "y"
 
-if a == "y":
-   for i in range(len(list_old_filenames)):
-      os.rename( list_old_filenames[i], list_new_filenames[i])
+if a == "y" or a == "Y":
+        for i in range(len(list_old_filenames)):
+                os.rename( list_old_filenames[i], list_new_filenames[i])
