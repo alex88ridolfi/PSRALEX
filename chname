@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
-#                     Version 1.0-beta1                        #
-#                    Bonn, November 2017                       #
+#                        Version 1.3                           #
+#                   Cagliari, August 2023                      #
 ################################################################
 
 
@@ -10,7 +10,7 @@ import sys, os, os.path, glob
 
 
 #ARGOMENTI DA SHELL
-string_version = "1.2 (28Oct2018)"
+string_version = "1.3 (28Aug2023)"
 flag_force = 0
 
 if "-f" in sys.argv:
@@ -19,7 +19,7 @@ if "-f" in sys.argv:
 
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-        print("USAGE1: %s oldstring newstring [-f]" % (os.path.basename(sys.argv[0])))
+        print("USAGE1: %s oldstring newstring" % (os.path.basename(sys.argv[0])))
         print("USAGE2: %s -old \"oldstring\" -new \"newstring\" -files \"<files*.ar>\" [-f]" % (os.path.basename(sys.argv[0])))
         print()
         print(" -f: force the changes without asking for confirmation")
@@ -51,7 +51,7 @@ elif len(sys.argv) > 3:
 list_new_filenames = [f.replace(oldstring, newstring) for f in list_old_filenames]                   
 
 if len(list_new_filenames) == 0:
-        print("ERROR: No files in the current directory has '%s' in their names! Exiting..." % (oldstring))
+        print("ERROR: No selected file has '%s' in its name! Exiting..." % (oldstring))
         exit()
 
 length_max_old_filenames = max([len(x) for x in list_old_filenames] )
