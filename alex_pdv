@@ -96,7 +96,6 @@ for i in range(len(list_files)):
                 
         if flag_normalize == 1:
                 I_norm = copy.deepcopy(I / np.amax(I))
-                
 
                 if npol ==4:
                         Q_norm = copy.deepcopy(Q / np.amax(I))
@@ -111,18 +110,21 @@ for i in range(len(list_files)):
                         V = copy.deepcopy(V_norm)
                         L = copy.deepcopy(L_norm)
 
-                        I = copy.deepcopy(I_norm)
+                        
                         
                         #print L[:]
                         
                         PA_deg = 0.5 * np.arctan(U/Q) * 180./np.pi
                 else:
+                        
                         Q = np.zeros(I.shape)
                         U = np.zeros(I.shape)
                         V = np.zeros(I.shape)
                         L = np.zeros(I.shape)
                         PA_deg = np.zeros(I.shape)
 
+                I = copy.deepcopy(I_norm)
+                
         if flag_unbias_L == 1:
                 index_start = nbin*phase_start
                 index_end   = nbin*phase_end
