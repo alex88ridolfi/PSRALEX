@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
 #                     Version 1.0-beta1                        #
@@ -7,7 +7,7 @@
 
 
 import sys, os, os.path, glob, copy
-import random, time, gc, imp
+import random, time, gc
 import numpy as np
 import subprocess
 
@@ -25,17 +25,17 @@ flag_unbias_L = 0
 string_version = "1.0-beta1 (12Nov2017)"
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-        print "USAGE: %s -ar \"*.ar\" [-normalize] [-unbias_L \"offpulse_phase_start,offpulse_phase_end\" -nbin N]" % (os.path.basename(sys.argv[0]))
+        print("USAGE: %s -ar \"*.ar\" [-normalize] [-unbias_L \"offpulse_phase_start,offpulse_phase_end\" -nbin N]" % (os.path.basename(sys.argv[0])))
         exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-        print "Version: %s" % (string_version)
+        print("Version: %s" % (string_version))
         exit()
 else:
         for j in range( 1, len(sys.argv)):
                 if (sys.argv[j] == "-ar"):
                         string_files = sys.argv[j+1]
                         if ("*" in string_files) or ("?" in string_files):
-                                print string_files.strip("\"")
+                                print(string_files.strip("\""))
                                 list_files = sorted(glob.glob(string_files.strip("\"")), key=lambda s: s.lower())
                         else:
                                 list_files = string_files.replace(" ","").split(",")
