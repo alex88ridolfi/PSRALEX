@@ -83,15 +83,15 @@ elif (("-version" in sys.argv) or ("--version" in sys.argv)):
 else:
     for n in range(1, len(sys.argv)):
         if (sys.argv[n] == "-Pb"):
-            Pb_d = np.float(sys.argv[n+1])
+            Pb_d = np.float64(sys.argv[n+1])
         elif (sys.argv[n] == "-xp"):
-            xp_lts = np.float(sys.argv[n+1])
+            xp_lts = np.float64(sys.argv[n+1])
         elif (sys.argv[n] == "-par"):
             parfile_name = sys.argv[n+1]
         elif (sys.argv[n] == "-allinc"):
             flag_allinc = 1
         elif (sys.argv[n] == "-Mp"):
-            Mp_assumed_Msun = np.float(sys.argv[n+1])
+            Mp_assumed_Msun = np.float64(sys.argv[n+1])
 
 if parfile_name == "":
     Pb_s = Pb_d*86400
@@ -99,12 +99,12 @@ if parfile_name == "":
 else:
     dict_parfile = import_parfile(parfile_name)
     try:
-        Pb_days = np.float(dict_parfile['PB'])
+        Pb_days = np.float64(dict_parfile['PB'])
         Pb_s = np.float(dict_parfile['PB']) * 86400
     except KeyError:
-        Pb_s = 1. / np.float(dict_parfile['FB0'])
+        Pb_s = 1. / np.float64(dict_parfile['FB0'])
         Pb_days = Pb_s/86400.
-    xp_lts = np.float(dict_parfile['A1'])
+    xp_lts = np.float64(dict_parfile['A1'])
     xp_cm = xp_lts * LIGHT_SPEED
     
 

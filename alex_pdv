@@ -44,7 +44,7 @@ else:
                         flag_normalize = 1
                 elif (sys.argv[j] == "-unbias_L"):
                         flag_unbias_L = 1
-                        phase_start,phase_end = [ np.float(x) for x in sys.argv[j+1].split(",") ]
+                        phase_start,phase_end = [ np.float64(x) for x in sys.argv[j+1].split(",") ]
                         
                 elif (sys.argv[j] == "-nbin"):
                         nbin_requested = int(sys.argv[j+1])
@@ -147,7 +147,7 @@ for i in range(len(list_files)):
 
         outfile.write("Pulse_Phase          I          Q          U          V          L          P.A. (deg)\n")
         for n in range(int(nbin)):
-                outfile.write("%.4f          %.10f          %.10f          %.10f          %.10f          %.10f          %.3f\n" % (n /np.float(nbin), I[n], Q[n], U[n], V[n], L[n], PA_deg[n]) )
+                outfile.write("%.4f          %.10f          %.10f          %.10f          %.10f          %.10f          %.3f\n" % (n /np.float64(nbin), I[n], Q[n], U[n], V[n], L[n], PA_deg[n]) )
         outfile.close()
         
 

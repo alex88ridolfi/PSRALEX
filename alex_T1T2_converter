@@ -68,7 +68,7 @@ def import_parfile2( infile ):
                         if len(split_line) == 2:
                                 dict_parfile[ split_line[0] ] = [ split_line[1].replace("D-", "e-"), '-', '-' ]
                                 try:
-                                        if np.float(split_line[1]) == 0:
+                                        if np.float64(split_line[1]) == 0:
                                                 dict_parfile[ split_line[0] ][0]="0"
                                 except:
                                         pass
@@ -168,7 +168,7 @@ for j in range(len(list_lines_current_timfile)):
                         
                 #Formato PRINCETON (TEMPO1)
                 #elif (len(split_line_T1)==5 and (split_line_T1[4]=="0.00000"))
-                elif (len(split_line_T1)==5 and (np.float(split_line_T1[2]) > 40000 and np.float(split_line_T1[2]) < 60000)):
+                elif (len(split_line_T1)==5 and (np.float64(split_line_T1[2]) > 40000 and np.float64(split_line_T1[2]) < 60000)):
                         #print "Ho individuato il formato PRINCETON"
                         obs_flag_T1 = split_line_T1[0]
                         freq_T1 = split_line_T1[1]
@@ -184,7 +184,7 @@ for j in range(len(list_lines_current_timfile)):
                         line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
 
                 #Formato PRINCETON (TEMPO1) commentato
-                elif len(split_line_T1)==6 and (np.float(split_line_T1[2]) > 40000 and np.float(split_line_T1[2]) < 60000) and (split_line_T1[0]=="C"):
+                elif len(split_line_T1)==6 and (np.float64(split_line_T1[2]) > 40000 and np.float64(split_line_T1[2]) < 60000) and (split_line_T1[0]=="C"):
                         #print "Ho individuato il formato PRINCETON COMMENTATO"
                         obs_flag_T1 = split_line_T1[0+1]
                         freq_T1 = split_line_T1[1+1]
@@ -207,7 +207,7 @@ for j in range(len(list_lines_current_timfile)):
                         
                         
                 #Formato PRINCETON VAR (TEMPO1)
-                elif (len(split_line_T1)==6 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
+                elif (len(split_line_T1)==6 and (np.float64(split_line_T1[4]) > 40000 and np.float64(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
                         #print "Ho individuato il formato PRINCETON VAR"
                         obs_flag_T1 = split_line_T1[0]
                         freq_T1 = split_line_T1[3]
@@ -222,7 +222,7 @@ for j in range(len(list_lines_current_timfile)):
                         
                         line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
                 #Formato PRINCETON VAR commentato
-                elif (len(split_line_T1)==7 and (split_line_T1[0]=="C") and (np.float(split_line_T1[5]) > 40000 and np.float(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
+                elif (len(split_line_T1)==7 and (split_line_T1[0]=="C") and (np.float64(split_line_T1[5]) > 40000 and np.float64(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
                         #print "Ho individuato il formato PRINCETON VAR commentato"
                         obs_flag_T1 = split_line_T1[0+1]
                         freq_T1 = split_line_T1[3+1]
@@ -239,7 +239,7 @@ for j in range(len(list_lines_current_timfile)):
 
 
                 #Formato PRINCETON VAR-2 (TEMPO1)
-                elif (len(split_line_T1)==8 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
+                elif (len(split_line_T1)==8 and (np.float64(split_line_T1[4]) > 40000 and np.float64(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit())):
                         #print "Ho individuato il formato PRINCETON VAR-2"
                         obs_flag_T1 = split_line_T1[0]
                         freq_T1 = split_line_T1[3]
@@ -254,7 +254,7 @@ for j in range(len(list_lines_current_timfile)):
                         
                         line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
                 #Formato PRINCETON VAR-2 commentato
-                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float(split_line_T1[5]) > 40000 and np.float(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
+                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float64(split_line_T1[5]) > 40000 and np.float64(split_line_T1[5]) < 60000) and (split_line_T1[2].isdigit())):
                         #print "Ho individuato il formato PRINCETON VAR-2 commentato"
                         obs_flag_T1 = split_line_T1[0+1]
                         freq_T1 = split_line_T1[3+1]
@@ -301,7 +301,7 @@ for j in range(len(list_lines_current_timfile)):
                         toa_err_T2 = "%7.3f" % ( np.float64(toa_err_T1))
                         
                         line_T2 = "C %s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
-                elif (len(split_line_T1)==8 and (np.float(split_line_T1[4]) > 40000 and np.float(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit()) and (np.float(split_line_T1[3]) > 300 and np.float(split_line_T1[3]) < 10000) ):
+                elif (len(split_line_T1)==8 and (np.float64(split_line_T1[4]) > 40000 and np.float64(split_line_T1[4]) < 60000) and (split_line_T1[1].isdigit()) and (np.float64(split_line_T1[3]) > 300 and np.float64(split_line_T1[3]) < 10000) ):
                         #print "Ho individuato il formato LIGO"
                         obs_flag_T1 = split_line_T1[7]
                         freq_T1 = split_line_T1[3]
@@ -316,7 +316,7 @@ for j in range(len(list_lines_current_timfile)):
                         
                         line_T2 = "%s %s %s %s %s%s" % (current_archive, freq_T2, mjd_T2, toa_err_T2, obs_flag_T2, string_group_label)
 
-                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float(split_line_T1[4+1]) > 40000 and np.float(split_line_T1[4+1]) < 60000) and (split_line_T1[1+1].isdigit()) and (np.float(split_line_T1[3+1]) > 300 and np.float(split_line_T1[3+1]) < 10000) ):
+                elif (len(split_line_T1)==9 and (split_line_T1[0]=="C") and (np.float64(split_line_T1[4+1]) > 40000 and np.float64(split_line_T1[4+1]) < 60000) and (split_line_T1[1+1].isdigit()) and (np.float64(split_line_T1[3+1]) > 300 and np.float64(split_line_T1[3+1]) < 10000) ):
                         #print "Ho individuato il formato LIGO COMMENTATO"
                         obs_flag_T1 = split_line_T1[7+1]
                         freq_T1 = split_line_T1[3+1]
@@ -413,7 +413,7 @@ if 'E' in dict_parfile_T1.keys():
         dict_parfile_T2['ECC']= dict_parfile_T2['E']
         dict_parfile_T2.pop('E')
 if 'PBDOT' in dict_parfile_T2.keys():
-        dict_parfile_T2['PBDOT'][0] = "%.10e" % np.float( dict_parfile_T2['PBDOT'][0] + "e-12")
+        dict_parfile_T2['PBDOT'][0] = "%.10e" % np.float64( dict_parfile_T2['PBDOT'][0] + "e-12")
 if 'SOLARN0' in dict_parfile_T2.keys():
         dict_parfile_T2.pop('SOLARN0')
 
