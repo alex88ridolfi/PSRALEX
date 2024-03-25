@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
 #                     Version 1.0-beta1                        #
@@ -7,19 +7,24 @@
 
 
 import sys, os, os.path, glob
-import random, time, gc, imp
+import random, time, gc, copy
 import numpy as np
 import subprocess
 
 import psrchive
 
+flag_frequency_only = 0
+flag_time_only = 0
+flag_ask = 1
+new_ext = ""
+
 #ARGOMENTI DA SHELL
 string_version = "1.0-beta1 (12Nov2017)"
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-    print "Usage: %s -e newext -source \"*.clean\" -dest \"*.ar\"" % (os.path.basename(sys.argv[0])) 
+    print("Usage: %s -e newext -source \"*.clean\" -dest \"*.ar\" [{-frequency_only | -time_only}] [-f]" % (os.path.basename(sys.argv[0]))) 
     exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-    print "Version: %s" % (string_version)
+    print("Version: %s" % (string_version))
     exit()
 else:
     for j in range( 1, len(sys.argv)):
@@ -40,27 +45,59 @@ else:
             N_files_dest = len(list_files_dest)
         elif (sys.argv[j] == "-e"):
             new_ext = sys.argv[j+1]
-            
+        elif (sys.argv[j] == "-frequency_only"):
+            flag_frequency_only = 1
+        elif (sys.argv[j] == "-time_only"):
+            flag_time_only = 1
+        elif (sys.argv[j] == "-f"):
+            flag_ask = 0
 
 
-print
-print "#"*62
-print "#" + " "*14 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*14 + "#"
-print "#"*62
-print
 
+print()
+print("#"*62)
+print("#" + " "*14 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*14 + "#")
+print("#"*62)
+print()
+
+if new_ext == "":
+    print()
+    print("ERROR: You must specify a new extension, using the option '-e'!")
+    exit()
 
 if (N_files_source != N_files_dest):
-    print
-    print "ERROR: the number of source files (%d) does not match the number of destination files (%d)!" % (N_files_source, N_files_dest)
+    if N_files_source !=1:
+        print()
+        print("ERROR: the number of source files (%d) does not match the number of destination files (%d)!" % (N_files_source, N_files_dest))
+        exit()
+    else:
+        list_files_source_new = [list_files_source[0]]* N_files_dest 
+        list_files_source = copy.deepcopy(list_files_source_new)
+        N_files_source = len(list_files_source)
+
+if flag_frequency_only == 1 and flag_time_only == 1:
+    print()
+    print("ERROR: You cannot use -frequency_only and -time_only together! Either choose one of them or don't use them at all.")
     exit()
 
 
-for i in range(N_files_source):
-    print "%50s   ----->  %-50s" % (list_files_source[i], list_files_dest[i])
 
-print
-flag_proceed = raw_input("Proceed? (y/n): ")
+for i in range(N_files_source):
+    print("%50s   ----->  %-50s" % (list_files_source[i], list_files_dest[i]))
+
+print()
+if flag_frequency_only == 1:
+    print("Will clean FREQUENCY domain only.")
+elif flag_time_only == 1:
+    print("Will clean TIME domain only.")
+else:
+    print("Will clean both FREQUENCY and TIME domain.")
+print()
+
+if flag_ask ==1:
+    flag_proceed = input("Proceed? (y/n): ")
+else:
+    flag_proceed = 'y'
 
 if flag_proceed == 'y' or flag_proceed == 'Y': 
     for i in range(N_files_source):
@@ -89,11 +126,24 @@ if flag_proceed == 'y' or flag_proceed == 'Y':
         
         array_weights = ar_source.get_weights()[index_nonempty_subint]
         list_channels_to_zap = np.where( array_weights == 0)[0]
-    
-        cmd_paz = 'paz -z "%s" -w "%s" -e %s %s' % (' '.join( [str(x) for x in list_channels_to_zap]), ' '.join( [str(x) for x in list_subint_to_zap]), new_ext, dest)
-        print
-        print cmd_paz
+
+        string_zap_channels = '-z "%s"' % (' '.join( [str(x) for x in list_channels_to_zap]))
+        string_zap_subints  = '-w "%s"' % (' '.join( [str(x) for x in list_subint_to_zap])  )
+
+        if flag_frequency_only == 1:
+            cmd_paz = 'paz  %s -e %s %s' % (string_zap_channels, new_ext, dest)
+            print()
+            print("Cleaning only the frequency domain...")
+        elif flag_time_only == 1:
+            cmd_paz = 'paz  %s -e %s %s' % (string_zap_subints,  new_ext, dest)
+            print("Cleaning only the time domain...")
+        else:
+            cmd_paz = 'paz  %s %s -e %s %s' % (string_zap_channels, string_zap_subints, new_ext, dest)
+            print("Cleaning both frequency and time domain...")
+        print()
+        print(cmd_paz)
 
         os.system(cmd_paz)
+
 
     
