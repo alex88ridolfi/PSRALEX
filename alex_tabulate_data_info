@@ -34,7 +34,9 @@ def get_command_output_with_pipe(command1, command2):
 
 def format_field(field, value):
 #        print("format_field: ", value)
-        if field == "file_name":
+        if field == "file_abspath":
+                str_value = "%-40s" % value.strip()
+        elif field == "file_name":
                 str_value = "%-40s" % value.strip()
         elif field == "file_basename":
                 str_value = "%-40s" % value.strip()
@@ -379,7 +381,7 @@ if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--hel
         print("%10s  %-40s:  %-50s" % ("-fields", "\"field1,field2,...,fieldN\"", "Fields to tabulate for each observation"))
         print("%10s  %-40s:  %-50s" % ("-version", "", "Print code version"))
         print()
-        print("Available fields:\nfile_name | file_basename | data_format | telescope | observer | central_freq | freq_high | freq_low | nbits | chan_bw | total_bw | backend | ra | dec | source_name | start_mjd | start_date_time | start_date | start_time | obs_length_s | obs_length_min | obs_length_h | nchan | dm | n_samples | t_samp_us")
+        print("Available fields:\nfile_abspath | file_name | file_basename | data_format | telescope | observer | central_freq | freq_high | freq_low | nbits | chan_bw | total_bw | backend | ra | dec | source_name | start_mjd | start_date_time | start_date | start_time | obs_length_s | obs_length_min | obs_length_h | nchan | dm | n_samples | t_samp_us")
         print()
         print("For more details on the available fields: \033[1m%s -show_fields_details \033[0m" % (os.path.basename(sys.argv[0])))
         print()
@@ -404,7 +406,8 @@ else:
                 elif (sys.argv[j] == "-show_fields_details"):
                         print()
                         print("LIST OF AVAILABLE FIELDS AND THEIR MEANING:")
-                        print() 
+                        print()
+                        print("%-18s: %s " % ("file_abspath",      "Full path to the observation file , including extension"))
                         print("%-18s: %s " % ("file_name",         "File name of the observation, including extension"))
                         print("%-18s: %s " % ("file_basename",     "File name of the observation, without extension"))
                         print("%-18s: %s " % ("data_format",       "File format (filterbank/PSRFITS/time series)"))
