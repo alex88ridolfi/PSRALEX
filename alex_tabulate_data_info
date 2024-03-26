@@ -274,15 +274,15 @@ class Observation(object):
                                 try:        self.start_mjd        = np.float64(get_command_output("header %s -tstart"   % (self.file_abspath)).split()[-1])
                                 except:     self.start_mjd        = "N/A"
 
-                                try:        self.central_freq     = self.freq_high - 0.5*self.total_bw
-                                except:     self.central_freq     = "N/A"
-
                                 try:        self.freq_high        = np.float64(get_command_output("header %s -fch1"     % (self.file_abspath)).split()[-1]) + 0.5*self.chan_bw
                                 except:     self.freq_high        = "N/A"
 
                                 try:        self.freq_low         = self.freq_high - self.total_bw
                                 except:     self.freq_low         = "N/A"
 
+                                try:        self.central_freq     = self.freq_high - 0.5*self.total_bw
+                                except:     self.central_freq     = "N/A"
+                                
                                 try:        self.source_name      = get_command_output("header %s -source_name"     % (self.file_abspath)).strip()
                                 except:     self.source_name      = "N/A"
 
