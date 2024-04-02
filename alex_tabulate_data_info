@@ -2,7 +2,7 @@
 
 #################### ALESSANDRO RIDOLFI ########################
 #                        Version 1.0                           #
-#                    Cagliari,  Aug 2023                       #
+#                Cagliari,  Aug 2023-Mar 2024                  #
 ################################################################
 
 
@@ -367,10 +367,17 @@ class Observation(object):
                 try:      self.t_samp_us        = self.t_samp_s * 1.0e6
                 except:   self.t_samp_us        = "N/A"
 
-                try:      self.start_date       = Time(self.start_mjd, format='mjd').to_datetime().strftime("%Y-%m-%d %H:%M")
+                try:      self.start_date       = Time(self.start_mjd, format='mjd').to_datetime().strftime("%Y-%m-%d")
                 except:   self.start_date       = "N/A"
 
-string_version="0.1 (25Aug2023)"
+                try:      self.start_time       = Time(self.start_mjd, format='mjd').to_datetime().strftime("%H:%M")
+                except:   self.start_time       = "N/A"
+                
+                try:      self.start_date_time  = Time(self.start_mjd, format='mjd').to_datetime().strftime("%Y-%m-%d_%H:%M")
+                except:   self.start_date_time  = "N/A"
+
+                
+string_version="0.2 (26Mar2026)"
 verbosity_level=1
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
