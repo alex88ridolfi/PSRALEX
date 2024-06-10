@@ -1,15 +1,21 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
-#                     Version 1.0-beta1                        #
-#                    Bonn, November 2017                       #
+#                        Rome, 2020                            #
 ################################################################
 
 
 import sys, os, os.path, glob, shutil
 import numpy as np
+np.set_printoptions(threshold=1.0e7)
 
+try:
+    import psrchive
+    flag_has_psrchive_python_module = 1
+except:
+    flag_has_psrchive_python_module = 0
 
+string_version = "1.1 (26Jul2020)"
 
 def flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P, flag_verbose_mode=False, errors=(0,0,0) ):
     """                                                                                                                                                                                                                                                                      
@@ -27,7 +33,7 @@ def flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, 
     S_mean_mJy = ( (SNR * beta * Tsys) / (G * np.sqrt(npol * t_obs * bw) ) )  * np.sqrt( W_frac*P / ( P - W_frac*P))
 
     if flag_verbose_mode==True:
-        print "S_mean [mJy] = ( (%.2f * %.2f * %.2f K) / (%.1f K/Jy * sqrt( %d * %.1f s * %.2f MHz) ) )  * sqrt( %.2f * %.4f s / ( %.4f s - %.2f * %.4f s))  =  %.4f mJy" % (SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P, P , W_frac, P, S_mean_mJy)
+        print("S_mean [mJy] = ( (%.2f * %.2f * %.2f K) / (%.1f K/Jy * sqrt( %d * %.1f s * %.2f MHz) ) )  * sqrt( %.2f * %.4f s / ( %.4f s - %.2f * %.4f s))  =  %.4f mJy" % (SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P, P , W_frac, P, S_mean_mJy))
 
 
     if errors != (0,0,0):
@@ -47,15 +53,17 @@ def flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, 
         return S_mean_mJy
 
 
-#ARGOMENTI DA SHELL                                                                                                                                                              
-string_version = "1.0-beta1 (12Nov2017)"
+#SHELL ARGUMENTS
+archive_filename = ""
+verbosity_level = 1
+flag_quiet_mode = 0
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-    print "USAGE: %s -SNR [8.0] -beta [1.0] -Tsys [K] -G [K/Jy] -npol [2] -Tobs [s] -bw [MHz] -W_frac [0.05] -P [s]" % (os.path.basename(sys.argv[0]))
-    print
+    print("USAGE: %s -SNR [8.0] -beta [1.0] -Tsys [K] -G [K/Jy] -npol [2] -W_frac [0.05] {-ar <archive> | -Tobs [s] -bw [MHz] -P [s]}   [-V]" % (os.path.basename(sys.argv[0])))
+    print()
     exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-    print "Version: %s" % (string_version)
+    print("Version: %s" % (string_version))
     exit()
 else:
     for n in range(1, len(sys.argv)-1):
@@ -69,17 +77,95 @@ else:
             G = np.float64(sys.argv[n+1])
         elif (sys.argv[n] == "-npol"):
             npol = np.float64(sys.argv[n+1])
-        elif (sys.argv[n] == "-Tobs"):
-            t_obs = np.float64(sys.argv[n+1])
-        elif (sys.argv[n] == "-bw"):
-            bw = np.float64(sys.argv[n+1])
         elif (sys.argv[n] == "-W_frac"):
             W_frac = np.float64(sys.argv[n+1])
+#====================================================
         elif (sys.argv[n] == "-P"):
             P = np.float64(sys.argv[n+1])
+        elif (sys.argv[n] == "-bw"):
+            bw = np.float64(sys.argv[n+1])
+        elif (sys.argv[n] == "-Tobs"):
+            t_obs = np.float64(sys.argv[n+1])
+#====================================================
+        elif (sys.argv[n] == "-ar"):
+            archive_filename = sys.argv[n+1]
+        elif (sys.argv[n] == "-q"):
+            flag_quiet_mode = 1
+        elif (sys.argv[n] == "-V"):
+            verbosity_level = 2
 
 
+if archive_filename != "" and flag_quiet_mode==0:
+        verbosity_level = 2
+
+            
+
+
+if archive_filename != "":
+    ar = psrchive.Archive_load( archive_filename )
+
+    nbin    = ar.get_nbin()
+    nsub    = ar.get_nsubint()
+    npol    = ar.get_npol()
+    nchan   = ar.get_nchan()
+
+    bw_MHz       = ar.get_bandwidth()
+    bw_chan_MHz  = bw_MHz/ nchan
+
+    inte            = ar.get_Integration(int(nsub/2.))
+    subint_length_s = inte.get_duration()
+
+    P = inte.get_folding_period()
+
+
+    
+    weights = ar.get_weights()
+
+    list_subint_to_zap = []
+
+    flag_found_nonempty_subint = 0
+    
+    for i in range(0,nsub):
+        if np.count_nonzero(weights[i]) == 0:  #if the values are all zero                                                                                                 
+            list_subint_to_zap.append(i)
+        elif flag_found_nonempty_subint == 0:
+            index_nonempty_subint = i
+            flag_found_nonempty_subint == 1
+
+
+
+
+    array_weights = ar.get_weights()[index_nonempty_subint]
+    list_channels_to_zap = np.where( array_weights == 0)[0]
+    nchan_effective   = nchan - len(list_channels_to_zap)
+    nsub_effective    = nsub  - len(list_subint_to_zap)
+    bw_effective_MHz  = np.fabs(bw_chan_MHz * nchan_effective)
+    t_obs_effective_s = subint_length_s * nsub_effective
+
+    if verbosity_level >=2:
+        print()
+        print("--------------------------------------------------------------------")
+        print()
+        print("%40s: '%s'" % ("Archive", archive_filename))
+        print()
+        print("%40s: %s" % ("List zapped channel",list_channels_to_zap))
+        print("%40s: %s" % ("List zapped subint", list_subint_to_zap))
+        print()
+        print("%40s: %.6f" % ("Folding period (s)", P))
+        print("%40s: %.6f" % ("Subint length (s)", subint_length_s))
+        print("%40s: %d" % ("Nsub", nsub))
+        print("%40s: %d" % ("Nsub effective", nsub_effective))
+        print("%40s: %.3f" % ("Effective BW (MHz)", bw_effective_MHz))
+        print("%40s: %.3f" % ("Effective Tobs (s)", t_obs_effective_s))
+        print()
+        print()
+        print("--------------------------------------------------------------------")
+        print()
+
+    t_obs = t_obs_effective_s
+    bw    = bw_effective_MHz
 
 S_mean_mJy = flux_with_radiometer_equation( SNR, beta, Tsys, G, npol, t_obs, bw, W_frac, P)
 
-print "S_mean = %.5f mJy" % (S_mean_mJy)
+print("%-70s  S_mean = %.5f mJy" % (archive_filename, S_mean_mJy))
+
