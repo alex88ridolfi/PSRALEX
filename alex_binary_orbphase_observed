@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+
+#################### ALESSANDRO RIDOLFI ########################
+#                        Version 1.0                           #
+#           Cape Town, Nov 2018 - Bonn, Jul 2024               #
+################################################################
+
+
+import sys, os, os.path, glob, subprocess
+import numpy as np
+
+#ALL CONSTANTS IN CGS UNITS
+LIGHT_SPEED                                     = 2.99792458e10
+G                                               = 6.67259e-8
+M_SUN_CGS                                       = 1.989e33
+R_SUN_CGS                                       = 6.955e10
+
+
+def convert_Pdot_into_F1(P, Pdot):
+        F1 =  -Pdot / np.power(P, 2)
+        return F1
+
+def get_command_output(command):
+    list_for_Popen = command.split()
+    proc = subprocess.Popen(list_for_Popen, stdout=subprocess.PIPE)
+    out, err = proc.communicate()
+
+    return out.decode('ascii')
+
+def import_parfile( infile ):
+        parfile = open( infile, "r" )
+        dict_parfile = {}
+
+        for line in parfile:
+                if line != "\n":
+                        split_line = line.split()
+                        dict_parfile[ split_line[0] ] = split_line[1]
+                        if "D-" in dict_parfile[ split_line[0] ]:
+                                dict_parfile[ split_line[0] ] = dict_parfile[ split_line[0] ].replace("D-", "e-")
+
+        return dict_parfile
+
+
+
+def calculate_roche_lobe_of_companion_in_cm_with_Eggleton(a_cm, Mp_Msun, Mc_Msun):
+        q = float(Mc_Msun) / float(Mp_Msun)
+        Roche_radius_cm = a_cm * 0.49 * np.power(q, 2./3.)   / (0.6* np.power(q, 2./3.)   +   np.log(1 + np.power(q, 1./3)))
+        return Roche_radius_cm
+
+
+def calculate_mass_function_from_PB_and_A1(Pb_days, xp_lts):
+        Pb_s = Pb_days*86400.
+        ap_cm = xp_lts * LIGHT_SPEED
+        f_Mp_grams = (4*np.power(np.pi, 2.) / G ) * (np.power(ap_cm, 3.)  / np.power(Pb_s, 2.)\
+)
+        return f_Mp_grams
+
+
+def solve_mass_function_for_Mc_from_f_Mp(inc_rad, f_Mp_Msun, Mp_Msun=1.4):
+        Mc_Msun_min  = f_Mp_Msun
+        K = f_Mp_Msun / ( np.power( np.sin(inc_rad), 3 ) )              #costante K                        
+
+        x_n1            = Mc_Msun_min #parto dalla x estremo inferiore del range possibile di Mc           
+        x_n             = Mc_Msun_min +1   #valore a a buffo                                               
+        count = 0
+
+
+        while ( abs(x_n1 - x_n) > 1.0e-6 ):
+                count = count +1
+                x_n = x_n1
+                y_xn                    =  (x_n**3) / ( (Mp_Msun +x_n)**2 ) -  K
+                y_derivative_xn         =  3*(x_n**2) /  ((Mp_Msun +x_n)**2 ) -2*(x_n**3) /  ( (Mp_Msun +x_n)**3 )
+
+                x_n1 = x_n - ( y_xn / y_derivative_xn )
+
+
+        return x_n1
+
+
+
+parfile_name = ""
+
+#ARGOMENTI DA SHELL              
+string_version = "1.0 (18Lug2024)"
+if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
+        print("USAGE: %s -par <ephemeris> -obs \"*.dat\"" % (os.path.basename(sys.argv[0])))
+        print()
+        exit()
+elif (("-version" in sys.argv) or ("--version" in sys.argv)):
+        print("Version: %s" % (string_version))
+        exit()
+else:
+        for j in range(1, len(sys.argv)):
+                if (sys.argv[j] == "-obs"):
+                        string_files = sys.argv[j+1]
+                        if ("*" in string_files) or ("?" in string_files):
+                                #print(string_files.strip("\""))
+                                list_files = sorted(glob.glob(string_files.strip("\"")))
+                        else:
+                                list_files = string_files.split(",")
+
+
+                if (sys.argv[j] == "-par"):
+                        parfile_name = sys.argv[j+1]
+
+dict_parfile_pulsar = import_parfile(parfile_name)
+        
+try:        Pb_s_T0 = np.float64(dict_parfile_pulsar['PB'])*86400
+except:     Pb_s_T0 = 1./np.float64(dict_parfile_pulsar['FB0'])
+Pb_s = Pb_s_T0
+
+try:
+        Pb_s_dot = np.float64(dict_parfile_pulsar['PBDOT'])
+        if np.fabs(Pb_s_dot) > 1.0e-7:
+                print("\033[1mWARNING\033[0m: |Pb_s_dot| > 1.0e-7   ----> probably a TEMPO1 ephemeris, hence I multiply this value by 1.0e-12")
+                Pb_s_dot = Pb_s_dot*1.0e-12
+
+except:     Pb_s_dot = 0
+Pepoch = np.float64(dict_parfile_pulsar['PEPOCH'])
+
+try:      T0 =  np.float64(dict_parfile_pulsar['T0'])
+except:   T0 =  np.float64(dict_parfile_pulsar['TASC'])
+
+try:      ecc = np.float64(dict_parfile_pulsar['E'])
+except:   ecc = np.float64(dict_parfile_pulsar['ECC'])
+
+    
+print("%60s %20s %20s %18s %20s %20s" % ("Observation", "Start Epoch (MJD)", "End Epoch (MJD)", "Obs. Length (s)", "Start Mean Anomaly", "End Mean Anomaly"))
+
+for i in range(len(list_files)):
+        obs_filename = list_files[i]
+        
+        if obs_filename.endswith(".dat"):
+                f_basename = os.path.splitext(obs_filename)[0]
+                inffile = f_basename + ".inf"
+                datfile_fullpath = os.path.abspath(obs_filename)
+                inffile_fullpath = os.path.abspath(inffile)
+                source_name = get_command_output("grep Object %s" % (inffile_fullpath)).split("=")[1].strip()
+                dt = np.float64( get_command_output("grep Width %s" % (inffile_fullpath)).split("=")[1].strip() )
+                Tstart = np.float64( get_command_output("grep Epoch %s" % (inffile_fullpath)).split("=")[1].strip() )
+                N_samples_original = int(get_command_output("grep bins %s" % (inffile_fullpath)).split("=")[1].strip() )
+                original_obs_length_s   = N_samples_original*dt
+        
+
+        Pb_s_Tstart = Pb_s_T0 + Pb_s_dot*( Tstart -  T0)*86400.
+        
+        Fb_Hz_T0 = (1./Pb_s_T0)
+        Fb_Hz_dot = convert_Pdot_into_F1(Pb_s_T0, Pb_s_dot)
+
+
+        N_orbits_Tstart = Fb_Hz_T0 * ( (Tstart - T0)*86400) + 0.5*Fb_Hz_dot*((Tstart - T0)*86400)**2
+
+        if N_orbits_Tstart < 0:         N_orbits_Tstart = N_orbits_Tstart + np.fabs(int(N_orbits_Tstart)) +1
+        elif N_orbits_Tstart > 1:       N_orbits_Tstart = N_orbits_Tstart - int(N_orbits_Tstart)
+        start_orbphase_M = np.modf( N_orbits_Tstart )[0]
+
+        t_start = start_orbphase_M*Pb_s_T0
+        t_obs =  original_obs_length_s
+        t_end = t_start + t_obs
+
+
+        end_orbphase_M = start_orbphase_M + (t_obs)/Pb_s_T0
+        Tend = Tstart + (t_obs)/86400.
+
+        print("%60s %20.5f %20.5f %18.2f %20.5f %20.5f" % (obs_filename, Tstart, Tend, t_obs, start_orbphase_M, end_orbphase_M))
+
+
+
+
+exit()
+
