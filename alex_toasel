@@ -1,20 +1,19 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 #################### ALESSANDRO RIDOLFI ########################
-#                     Version 1.0-beta1                        #
-#                    Bonn, Feb-Nov 2017                        #
+#                        Version 1.0                           #
+#                 Bonn, Feb 2017 - Jul 2024                    #
 ################################################################
 
 
 import sys, os, os.path, glob
-import random, time, gc, imp
 import numpy as np
 import subprocess
 
 
 def scrunch(scrunch_string, newext, archive):
         cmd_pam = "pam %s -e %s %s" % (scrunch_string, newext, archive)
-        print cmd_pam
+        print(cmd_pam)
         os.system( cmd_pam )
                                 
 
@@ -28,7 +27,7 @@ def extract_toas(archive, standard_profile, str_patoptions="", flag_print_cmd=Fa
         str_toas = "\nC %s\n" % (archive)
         cmd_pat = "pat %s -s %s %s" % (str_patoptions, standard_profile, archive)
         if flag_print_cmd==True:
-                print "Command: %s" % (cmd_pat)
+                print("Command: %s" % (cmd_pat))
 
         proc = subprocess.Popen(cmd_pat.split() , stdout=subprocess.PIPE)
         out, err = proc.communicate()
@@ -45,62 +44,59 @@ def get_command_output(command):
                         
 
 def show_archive_ids(list_original_archives, list_current_archives):
-	print "Archives:"
-	print
+	print("Archives:")
+	print()
 	for i in range(0, len(list_current_archives)):
 		string_archive = "%3d) %-40s" % (i, list_original_archives[i]) 
 		if (list_current_archives[i] != list_original_archives[i]):
 			string_archive = string_archive + "    ---> %s" % (list_current_archives[i])
-		print string_archive
+		print(string_archive)
 
 def ask_for_operation(id_ar, archive, standard_profile, N_archives):
-	print "ARCHIVE: %3d / %d | %s" % (id_ar, N_archives-1, archive)
-	nchan,nsub,npol = get_command_output(  "vap -c nchan,nsub,npol %s" % (archive)   ).split()[-3:]
-	print "%8s: %4s" % ("nchan", nchan) 
-	print "%8s: %4s" % ("nsub", nsub)
-	print "%8s: %4s" % ("npol", npol)
-	print
-
-
-	print "  %-20s -> Time scrunch or set number of subint" % ("T  |  tX  |  sN")
-        print "  %-20s -> Frequency scrunch or set number of channels" % ("F  |  fX  |  cN")
-	print "  %-20s -> View/clean with pazi" % ("v")
+        print("ARCHIVE: %3d / %d | %s" % (id_ar, N_archives-1, archive))
+        nchan,nsub,npol = get_command_output(  "vap -c nchan,nsub,npol %s" % (archive)   ).split()[-3:]
+        print("%8s: %4s" % ("nchan", nchan.decode('ascii'))) 
+        print("%8s: %4s" % ("nsub", nsub.decode('ascii')))
+        print("%8s: %4s" % ("npol", npol.decode('ascii')))
+        print()
+        print("  %-20s -> Time scrunch or set number of subint" % ("T  |  tX  |  sN"))
+        print("  %-20s -> Frequency scrunch or set number of channels" % ("F  |  fX  |  cN"))
+        print("  %-20s -> View/clean with pazi" % ("v"))
         #print "  %-20s -> Fast RFI zap with pazi" % ("z (NOT IMPLEMENTED)")
-	print "  %-20s -> Go to archive N" % ("a N")
-	print "  %-20s -> List archives and relative ids" % ("l")
-	print "  %-20s -> Extract TOAs and go to next archive" % ("x")
-	print "  %-20s -> Ignore TOAs and go to next archive" % ("n")
-	print "  %-20s -> Undo and go back to the original archive" % ("u")
-	print "  %-20s -> I am done!" % ("done")
-	print 
-	string_operation = raw_input("Operation: ")
-	return string_operation
+        print("  %-20s -> Go to archive N" % ("a N"))
+        print("  %-20s -> List archives and relative ids" % ("l"))
+        print("  %-20s -> Extract TOAs and go to next archive" % ("x"))
+        print("  %-20s -> Ignore TOAs and go to next archive" % ("n"))
+        print("  %-20s -> Undo and go back to the original archive" % ("u"))
+        print("  %-20s -> I am done!" % ("done"))
+        print() 
+        string_operation = input("Operation: ")
+        return string_operation
 
 def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_operation, newext, standard_profile, string_patoptions, flag_autoextract):
-	list_str_op = string_operation.split()
-	str_op = ''.join(list_str_op)
-
+        list_str_op = string_operation.split()
+        str_op = ''.join(list_str_op)
 
         if (str_op == "done" or str_op == "DONE"):
                 return archive, "no_write", len(list_curr_archives)
-        
-	elif (str_op[0] == "a" or str_op[0] == "A"):
-		i = int(str_op[1:])
-		return archive, "no_write", i
 
-	elif (str_op[0] == "l" or str_op[0] == "L"):
-		show_archive_ids(list_orig_archives, list_curr_archives)
-		return archive, "no_write", id_ar
+        elif (str_op[0] == "a" or str_op[0] == "A"):
+                i = int(str_op[1:])
+                return archive, "no_write", i
 
-	elif (str_op[0] == "v" or str_op[0] == "V"):
-		pazi(archive)
-		new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
-		
-		try:
-			os.rename(archive+".pazi", new_archive_name)
-			return new_archive_name, "", id_ar
-		except:
-			return archive, "no_write", id_ar
+        elif (str_op[0] == "l" or str_op[0] == "L"):
+                show_archive_ids(list_orig_archives, list_curr_archives)
+                return archive, "no_write", id_ar
+
+        elif (str_op[0] == "v" or str_op[0] == "V"):
+                pazi(archive)
+                new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                
+                try:
+                        os.rename(archive+".pazi", new_archive_name)
+                        return new_archive_name, "", id_ar
+                except:
+                        return archive, "no_write", id_ar
 
         elif (str_op[0] == "x" or str_op[0] == "X"):
                 if flag_autoextract == 1:
@@ -111,7 +107,7 @@ def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_
                 toas = extract_toas(archive, standard_profile, string_patoptions, flag_print_cmd)
                 return archive, toas, id_ar+1
 
-	elif (str_op[0] == "n" or str_op[0] == "N"):
+        elif (str_op[0] == "n" or str_op[0] == "N"):
                 return archive, "zero_toas", id_ar + 1
         
 
@@ -150,19 +146,19 @@ def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_
                 return new_archive_name, "no_write", id_ar
 
 
-	elif (str_op[0] == "u" or str_op[0] == "U"):
-		try:
-			new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
-			os.remove(new_archive_name)
-		except:
-			print "WARNING: You had not modified the original archive!\n\n"
+        elif (str_op[0] == "u" or str_op[0] == "U"):
+                try:
+                        new_archive_name = os.path.splitext(archive)[0] + ".%s" % (newext)
+                        os.remove(new_archive_name)
+                except:
+	                print("WARNING: You had not modified the original archive!\n\n")
 
                 return list_orig_archives[id_ar], "no_write", id_ar
 	
-	else:
-		print
-		print "WARNING: Command not valid! "
-		return archive, "no_write", id_ar
+        else:
+                print()
+                print("WARNING: Command not valid! ")
+                return archive, "no_write", id_ar
 
 
 
@@ -174,22 +170,22 @@ flag_autoextract = 0
 
 list_file_patterns = []
 #ARGOMENTI DA SHELL
-string_version = "1.0-beta1 (12Nov2017)"
+string_version = "1.0 (26Jul2024)"
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-	print "USAGE (standard):        %s -e newext      -s <standard_profile> -files \"*.ar\" [-patoptions \"-f princeton\"] [-o \"TOAs_outfilename.tim\"]" % (os.path.basename(sys.argv[0])) 
-        print "USAGE (autoextract):     %s -autoextract   -s <standard_profile> -files \"*.ar\" [-patoptions \"-f princeton\"] [-o \"TOAs_outfilename.tim\"]" % (os.path.basename(sys.argv[0]))
-	exit()
+        print("USAGE (standard):        %s -e newext      -s <standard_profile> -files \"*.ar\" [-patoptions \"-f princeton\"] [-o \"TOAs_outfilename.tim\"]" % (os.path.basename(sys.argv[0]))) 
+        print("USAGE (autoextract):     %s -autoextract   -s <standard_profile> -files \"*.ar\" [-patoptions \"-f princeton\"] [-o \"TOAs_outfilename.tim\"]" % (os.path.basename(sys.argv[0])))
+        exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-        print "Version: %s" % (string_version)
+        print("Version: %s" % (string_version))
         exit()
 else:
-	for j in range( 1, len(sys.argv)):
-		if (sys.argv[j] == "-e"):
-			new_ext = sys.argv[j+1]
-		elif (sys.argv[j] == "-s"):
-		        standard_profile = sys.argv[j+1]
-		elif (sys.argv[j] == "-files"):
+        for j in range( 1, len(sys.argv)):
+                if (sys.argv[j] == "-e"):
+                        new_ext = sys.argv[j+1]
+                elif (sys.argv[j] == "-s"):
+                        standard_profile = sys.argv[j+1]
+                elif (sys.argv[j] == "-files"):
                         list_file_patterns = glob.glob(sys.argv[j+1])
                 elif (sys.argv[j] == "-patoptions"):
                         string_patoptions = sys.argv[j+1]
@@ -214,19 +210,19 @@ list_current_archives = sorted(list_current_archives)
 
 list_toas = len(list_original_archives)*[""]
 
-print
-print "#"*62
-print "#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#"
-print "#"*62
-print
+print()
+print("#"*62)
+print("#" + " "*18 + "PSRALEX - %-20s" % (os.path.basename(sys.argv[0])) + " "*12 + "#")
+print("#"*62)
+print()
 
 
 show_archive_ids(list_original_archives, list_current_archives)
-print
-print
+print()
+print()
 if flag_autoextract == 1:
-        print "Autoextract MODE on"
-        print
+        print("Autoextract MODE on")
+        print()
 
         
 i = 0
@@ -250,35 +246,35 @@ while (i < len(list_original_archives)):
                         sys.stdout.flush()
 
                 elif flag_autoextract == 0:
-                        print "========================================================================"
+                        print("========================================================================")
                         string_operation = ask_for_operation(i, current_archive, standard_profile, N_archives)
 
                         
-		list_current_archives[i], str_toas , new_i = do_operation(i, current_archive, list_original_archives, list_current_archives, string_operation, new_ext, standard_profile, string_patoptions, flag_autoextract)
+                list_current_archives[i], str_toas , new_i = do_operation(i, current_archive, list_original_archives, list_current_archives, string_operation, new_ext, standard_profile, string_patoptions, flag_autoextract)
 		
-		if (str_toas == "no_write"):
-                        print
+                if (str_toas == "no_write"):
+                        print()
                         list_toas[i] = ""
                 elif (str_toas == "zero_toas"):
                         list_toas[i] = "\nC %s\n\n" % (current_archive)
-                        print
-                        print "TOAs:"
-                        print list_toas[i]
+                        print()
+                        print("TOAs:")
+                        print(list_toas[i])
                 else:
-			list_toas[i] = str_toas
-			f_toas_temp = open(temp_filename, "a")
-			f_toas_temp.write(list_toas[i])
-			f_toas_temp.close()
+                        list_toas[i] = str_toas
+                        f_toas_temp = open(temp_filename, "a")
+                        f_toas_temp.write(list_toas[i])
+                        f_toas_temp.close()
                         if flag_autoextract == 0:
-                                print
-                                print "TOAs:"
-                                print list_toas[i]
+                                print()
+                                print("TOAs:")
+                                print(list_toas[i])
 
 		
 	except ValueError:
-		print "You raised a value error"
+		print("You raised a value error")
 	except IndexError:
-		print "You raised an index error"
+		print("You raised an index error")
 		
 	i = new_i
 
@@ -300,9 +296,9 @@ for i in range(len(list_current_archives)):
 
 f_toas.close()
 os.remove(temp_filename)
-print
-print
-print "TOAs written in \"%s\"" % (outfilename)
+print()
+print()
+print("TOAs written in \"%s\"" % (outfilename))
 
 
 
