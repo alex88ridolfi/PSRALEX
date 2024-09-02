@@ -55,9 +55,9 @@ def show_archive_ids(list_original_archives, list_current_archives):
 def ask_for_operation(id_ar, archive, standard_profile, N_archives):
         print("ARCHIVE: %3d / %d | %s" % (id_ar, N_archives-1, archive))
         nchan,nsub,npol = get_command_output(  "vap -c nchan,nsub,npol %s" % (archive)   ).split()[-3:]
-        print("%8s: %4s" % ("nchan", nchan.decode('ascii'))) 
-        print("%8s: %4s" % ("nsub", nsub.decode('ascii')))
-        print("%8s: %4s" % ("npol", npol.decode('ascii')))
+        print("%8s: %4s" % ("nchan", nchan)) 
+        print("%8s: %4s" % ("nsub", nsub))
+        print("%8s: %4s" % ("npol", npol))
         print()
         print("  %-20s -> Time scrunch or set number of subint" % ("T  |  tX  |  sN"))
         print("  %-20s -> Frequency scrunch or set number of channels" % ("F  |  fX  |  cN"))
