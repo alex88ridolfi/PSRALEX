@@ -88,6 +88,8 @@ def format_field(field, value):
                 str_value = "%-12d" % value
         elif field == "t_samp_us":
                 str_value = "%-15.3f" % value
+        elif field == "npol":
+                str_value = "%d" % value
                 
         return str_value
 
@@ -188,7 +190,7 @@ class Observation(object):
                                         self.ra   = "00"+ ":" + str(object_file.header['src_raj'])[:2] + ":" + str(object_file.header['src_raj'])[2:]
                                         
                                 self.dec  = str(object_file.header['src_dej'])[:3] + ":" + str(object_file.header['src_dej'])[3:5] + ":" + str(object_file.header['src_dej'])[5:] 
-
+                                self.npol = 1    #filterbank files can only be total-intensity
 
 
 
@@ -336,6 +338,7 @@ class Observation(object):
                                 self.seconds_of_day = object_file.specinfo.secs
                                 self.source_name = object_file.specinfo.source
                                 self.telescope = object_file.specinfo.telescope
+                                self.npol = object_file.specinfo.num_polns
 
                         else:
                                 print("Reading PSRFITS (header only)....")
@@ -356,6 +359,7 @@ class Observation(object):
                                 self.MJD_sec_frac = np.float64(get_command_output("psrstat -Q -c ext:stt_offs %s" % (file_name)).split()[-1])
                                 self.MJD_sec = self.MJD_sec_int + self.MJD_sec_frac
                                 self.start_mjd   = self.MJD_int + np.float64(self.MJD_sec/86400.)
+                                self.npol = int(get_command_output("vap -n -c npol %s" % (file_name)).split()[-1])
                                 
 
                 try:      self.obs_length_min   = self.obs_length_s / 60.
@@ -388,7 +392,7 @@ if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--hel
         print("%10s  %-40s:  %-50s" % ("-fields", "\"field1,field2,...,fieldN\"", "Fields to tabulate for each observation"))
         print("%10s  %-40s:  %-50s" % ("-version", "", "Print code version"))
         print()
-        print("Available fields:\nfile_abspath | file_name | file_basename | data_format | telescope | observer | central_freq | freq_high | freq_low | nbits | chan_bw | total_bw | backend | ra | dec | source_name | start_mjd | start_date_time | start_date | start_time | obs_length_s | obs_length_min | obs_length_h | nchan | dm | n_samples | t_samp_us")
+        print("Available fields:\nfile_abspath | file_name | file_basename | data_format | telescope | observer | central_freq | freq_high | freq_low | nbits | chan_bw | total_bw | backend | ra | dec | source_name | start_mjd | start_date_time | start_date | start_time | obs_length_s | obs_length_min | obs_length_h | nchan | dm | n_samples | t_samp_us | npol")
         print()
         print("For more details on the available fields: \033[1m%s -show_fields_details \033[0m" % (os.path.basename(sys.argv[0])))
         print()
@@ -441,6 +445,7 @@ else:
                         print("%-18s: %s " % ("dm",                "Dispersion Measure used for Coherent/Incoherent Dedispersion (pc cm-3)"))
                         print("%-18s: %s " % ("n_samples",         "Number of time samples in the data"))
                         print("%-18s: %s " % ("t_samp_us",         "Sampling time size (microseconds)"))
+                        print("%-18s: %s " % ("npol",             "Number of polarizations"))
                         exit()
 
                 if (sys.argv[j] == "-V"):
