@@ -79,7 +79,7 @@ def format_field(field, value):
         elif field == "obs_length_min":
                 str_value = "%12d" % value
         elif field == "obs_length_h":
-                str_value = "%8d" % value
+                str_value = "%8.1f" % value
         elif field == "nchan":
                 str_value = "%-10d" % value
         elif field == "dm":
