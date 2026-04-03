@@ -401,7 +401,11 @@ for k in ["DMEPOCH", "POSEPOCH"]:
                 dict_parfile_T2[k] = [ dict_parfile_T2['PEPOCH'][0], "", "" ]
                 #print k, dict_parfile_T2[k]
 
-dict_parfile_T2['PSRJ'] = dict_parfile_T2['PSR']
+try:
+        dict_parfile_T2['PSRJ'] = dict_parfile_T2['PSR']
+except:
+        dict_parfile_T2['PSRJ'] = dict_parfile_T2['PSRJ']
+        
 dict_parfile_T2['EPHVER']= ['5', '', '']
 dict_parfile_T2['CLK']= ['TT(BIPM)', '', '']
 dict_parfile_T2['T2CMETHOD']= ['IAU2000B', '', '']
@@ -418,8 +422,8 @@ if 'PBDOT' in list(dict_parfile_T2.keys()):
 if 'SOLARN0' in list(dict_parfile_T2.keys()):
         dict_parfile_T2.pop('SOLARN0')
 
-        
-dict_parfile_T2.pop('PSR')
+if 'PSR' in dict_parfile_T2.keys():
+        dict_parfile_T2.pop('PSR')
 
 
 output_parfile_prefit_name = parfile_basename + "_T2_prefit.par"
