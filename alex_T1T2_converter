@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # coding=UTF-8
 import os, sys, glob
 import numpy as np
@@ -19,7 +19,7 @@ def write_parfile_formatted_T2_with_err( dict_parfile, outname):
         #print list_ordered_params_general_T2 + list_ordered_params_binary_T2
         #print
         for k in list_ordered_params_general_T2 + list_ordered_params_binary_T2:
-                if k in dict_parfile.keys():
+                if k in list(dict_parfile.keys()):
                         #print k, dict_parfile[k]
                         string = "%-14s %-26s %s  %-s\n" % (k, dict_parfile[k][0], dict_parfile[k][1], dict_parfile[k][2])
                         f_parfile.write(string)
@@ -47,6 +47,7 @@ def convert_obs_flag_T1_to_T2(flag_T1):
         elif flag_T1=="w":                flag_T2="ncyobs"
         elif flag_T1=="x":                flag_T2="lwa1"
         elif flag_T1=="z":                flag_T2="srt"
+        elif flag_T1=="k":                flag_T2="fast"
         return flag_T2
 
 
@@ -95,10 +96,10 @@ flag_tempo2_to_tempo1 = 0
 string_version = "1.0-beta1 (12Nov2017)"
 
 if (len(sys.argv) == 1 or ("-h" in sys.argv) or ("-help" in sys.argv) or ("--help" in sys.argv)):
-        print "USAGE: %s {-T1_to_T2 | -T2_to_T1}  -tim <tempo1_timfile.tim> -par <tempo1_parfile.par>\"" % (os.path.basename(sys.argv[0]))
+        print("USAGE: %s {-T1_to_T2 | -T2_to_T1}  -tim <tempo1_timfile.tim> -par <tempo1_parfile.par>\"" % (os.path.basename(sys.argv[0])))
         exit()
 elif (("-version" in sys.argv) or ("--version" in sys.argv)):
-        print "Version: %s" % (string_version)
+        print("Version: %s" % (string_version))
         exit()
 else:
         for j in range( 1, len(sys.argv)):
@@ -146,7 +147,7 @@ list_strings_label_parfile = []
 for j in range(len(list_lines_current_timfile)):
         #print
         #print "********************************************"
-        print list_lines_current_timfile[j]
+        print(list_lines_current_timfile[j])
         
         line_T1 = list_lines_current_timfile[j]
         split_line_T1 = line_T1.split()
@@ -375,7 +376,7 @@ dict_parfile_T1 = import_parfile2(parfile)
 #print
 dict_parfile_T2 = {}
 
-for k in dict_parfile_T1.keys():
+for k in list(dict_parfile_T1.keys()):
         value_tempo1        = dict_parfile_T1[k][0]
         flag_fit_tempo1     = dict_parfile_T1[k][1]
         err_tempo1          = dict_parfile_T1[k][2]
@@ -396,7 +397,7 @@ for k in dict_parfile_T1.keys():
         dict_parfile_T2[k] = [ value_tempo2, flag_fit_tempo2, err_tempo2 ]
 
 for k in ["DMEPOCH", "POSEPOCH"]:
-        if k not in dict_parfile_T1.keys():
+        if k not in list(dict_parfile_T1.keys()):
                 dict_parfile_T2[k] = [ dict_parfile_T2['PEPOCH'][0], "", "" ]
                 #print k, dict_parfile_T2[k]
 
@@ -409,12 +410,12 @@ dict_parfile_T2['TIMEEPH']= ['IF99', '', '']
 
 
 
-if 'E' in dict_parfile_T1.keys():
+if 'E' in list(dict_parfile_T1.keys()):
         dict_parfile_T2['ECC']= dict_parfile_T2['E']
         dict_parfile_T2.pop('E')
-if 'PBDOT' in dict_parfile_T2.keys():
+if 'PBDOT' in list(dict_parfile_T2.keys()):
         dict_parfile_T2['PBDOT'][0] = "%.10e" % np.float64( dict_parfile_T2['PBDOT'][0] + "e-12")
-if 'SOLARN0' in dict_parfile_T2.keys():
+if 'SOLARN0' in list(dict_parfile_T2.keys()):
         dict_parfile_T2.pop('SOLARN0')
 
         
