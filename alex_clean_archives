@@ -100,6 +100,11 @@ def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_
                         ar = psrchive.Archive_load( "%s.temp_Tp.pazi" % (archive_basename) )
                 except RuntimeError:
                         ar = psrchive.Archive_load( archive  )
+                except AttributeError:
+                        try:
+                            ar = psrchive.Archive.load( "%s.temp_Tp.pazi" % (archive_basename) )
+                        except RuntimeError:
+                            ar = psrchive.Archive.load( archive  )
 
                 nsub = ar.get_nsubint()
                 flag_found_nonempty_subint = 0
@@ -142,6 +147,11 @@ def do_operation(id_ar, archive, list_orig_archives, list_curr_archives, string_
                         ar = psrchive.Archive_load( "%s.temp_Fp.pazi" % (archive_basename) )
                 except RuntimeError:
                         ar = psrchive.Archive_load( archive  )
+                except AttributeError:
+                        try:
+                            ar = psrchive.Archive.load( "%s.temp_Fp.pazi" % (archive_basename) )
+                        except RuntimeError:
+                            ar = psrchive.Archive.load( archive  )
 
                 nsub = ar.get_nsubint()
                 list_subint_to_zap = []
